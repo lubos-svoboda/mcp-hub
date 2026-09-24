@@ -139,6 +139,19 @@ class PostgresCatalogIT {
         }
     }
 
+    /** A PostgreSQL date has no time of day, and the driver refuses to read one as a date-time. */
+    @Test
+    fun `a date comes back as an ISO date and a timestamp as a date-time`() {
+        val result = withEnvironment { environment ->
+            QueryRunner(ReadOnlySession(), ResultMapper()).run(
+                environment,
+                "select date '2026-03-15' as day, timestamp '2026-03-15 08:00:45' as moment",
+            )
+        }
+
+        assertThat(result.rows.single()).containsExactly("2026-03-15", "2026-03-15T08:00:45")
+    }
+
     /** bytea is a plain value, not a large object, and reading it as a BLOB fails outright. */
     @Test
     fun `a binary value is summarised by its size`() {

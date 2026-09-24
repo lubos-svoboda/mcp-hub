@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component
 import java.sql.ResultSet
 import java.sql.ResultSetMetaData
 import java.sql.Types
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 
@@ -78,8 +79,13 @@ class ResultMapper {
             // Read as a local date-time rather than through java.sql.Timestamp: Oracle DATE and
             // TIMESTAMP hold no zone, and converting via an instant would shift them by whatever
             // the JVM default zone happens to be.
-            Types.DATE, Types.TIMESTAMP ->
+            Types.TIMESTAMP ->
                 resultSet.getObject(columnIndex, LocalDateTime::class.java)?.toString()
+
+            // Only a PostgreSQL date arrives as DATE: it has no time of day, and the Oracle driver
+            // reports its own DATE, which does, as TIMESTAMP.
+            Types.DATE ->
+                resultSet.getObject(columnIndex, LocalDate::class.java)?.toString()
 
             Types.TIMESTAMP_WITH_TIMEZONE ->
                 resultSet.getObject(columnIndex, OffsetDateTime::class.java)?.toString()
