@@ -29,7 +29,7 @@ class WriteStatementRunner {
             "Environment ${settings.name} is read-only, so nothing can be written to it."
         }
 
-        return environment.dataSource.connection.use { connection ->
+        return environment.openConnection().use { connection ->
             connection.autoCommit = false
             try {
                 connection.createStatement().use { statement ->

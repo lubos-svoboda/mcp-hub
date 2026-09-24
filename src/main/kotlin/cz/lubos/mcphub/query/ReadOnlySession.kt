@@ -12,7 +12,7 @@ import java.sql.Connection
 class ReadOnlySession {
 
     fun <T> execute(environment: DatabaseEnvironment, work: (Connection) -> T): T =
-        environment.dataSource.connection.use { connection ->
+        environment.openConnection().use { connection ->
             connection.autoCommit = false
             try {
                 // SET TRANSACTION must be the first statement of its transaction, so whatever the

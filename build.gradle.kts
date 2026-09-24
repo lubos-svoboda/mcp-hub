@@ -62,6 +62,8 @@ dependencies {
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	// Grafana answers are large and the useful part is small; jq narrows them at the source.
 	implementation("net.thisptr:jackson-jq:1.6.5")
+	// Signs in to Microsoft Entra ID and renews the access token for Azure databases.
+	implementation("com.microsoft.azure:msal4j:1.26.0")
 	runtimeOnly("org.postgresql:postgresql")
 	runtimeOnly("com.oracle.database.jdbc:ojdbc17")
 	// The thin driver only knows a handful of character sets on its own. Without this a
