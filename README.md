@@ -16,6 +16,9 @@ shared by every client session on the machine.
   every assistant session on the machine uses the same process and the same connections.
 - **Three kinds of environment:** Oracle, PostgreSQL and Grafana (logs from Loki and the Grafana
   HTTP API), all configured in one list.
+- **Microsoft Entra ID sign-in for Azure Database for PostgreSQL.** Sign in once on the status
+  page; the server renews the access token on its own, so no connection drops when a token
+  expires and nothing needs reconnecting.
 - **A connection pool per database**, sized per environment, with idle connections exercised
   regularly so that a connection closed by a firewall is replaced before a query reaches it.
 - **Background connection and automatic recovery.** The server starts even when nothing can be
@@ -103,6 +106,8 @@ mcp-hub:
 | `description` | yes | Shown to the assistant by `list_environments`. See [writing a description](#writing-a-description). |
 | `url` | yes | JDBC URL of a database, or base address of a Grafana instance. |
 | `read-only` | no | `true` by default. Only `false` lets the writing tools change anything. |
+| `authentication` | no | `PASSWORD` by default. `ENTRA` signs a PostgreSQL environment in with Microsoft Entra ID; see [Microsoft Entra ID](#microsoft-entra-id). |
+| `entra-account` | with `ENTRA` | The entry under `mcp-hub.entra-accounts` to sign in with. |
 
 ### Writing a description
 
@@ -154,6 +159,82 @@ POSTGRES_CATALOG_DB:
   schema except the system catalogs.
 - For TLS, add the driver's parameters to the URL, for example
   `?sslmode=verify-full&sslrootcert=/config/certs/ca.pem`.
+
+### Microsoft Entra ID
+
+Azure Database for PostgreSQL can admit users by their Microsoft Entra ID sign-in instead of a
+password. Such an environment names an Entra account; you sign in once on the
+[status page](#status-page), and from then on the server renews the access token on its own.
+
+```yaml
+mcp-hub:
+  entra-accounts:
+    WORK:
+      tenant-id: 00000000-0000-0000-0000-000000000000
+      expected-user: you@example.com
+  environments:
+    AZURE_REPORTING_DB:
+      type: POSTGRESQL
+      description: Reporting database on Azure. Use it for monthly figures.
+      url: jdbc:postgresql://reporting.postgres.database.azure.com:5432/reporting?sslmode=require
+      username: app_readers
+      authentication: ENTRA
+      entra-account: WORK
+```
+
+| Property of an account | Required | Purpose |
+|---|---|---|
+| `tenant-id` | yes | The directory the account belongs to, as `az account show --query tenantId` prints it. A sign-in into any other tenant is refused. |
+| `expected-user` | no | When set, a sign-in by anybody else is refused, so one account cannot stand in for another. |
+| `client-id` | no | The application that signs in. See [the client ID](#the-client-id). |
+
+- `username` is the database role the token is mapped to: your own user principal name, or the
+  name of an Entra group that was made a principal of the database. There is no password.
+- Only `POSTGRESQL` environments can use `ENTRA`. Oracle and Grafana refuse it at startup.
+- Every environment naming the same account shares its sign-in, so several databases reached as
+  the same person need only one. A second account is needed only for a different user or a
+  different tenant. The subscription `az account set` selects plays no part in a database token.
+- Every connection is tagged with the `application_name` `mcp-hub/<signed-in user>`. The database
+  often knows only the group it was reached as, and this tells who is behind a session.
+
+**Signing in.** Until an account is signed in, its environments are down with the reason
+`Entra account WORK is not signed in; sign in on the status page.`
+
+```
+/status ─ Sign in ─▶ Microsoft sign-in in your browser (MFA, …) ─▶ back to /status
+                     └ answer posted to http://localhost:<port>/     environments up within seconds
+
+new connection ─▶ current access token ─ runs out within 5 minutes? ─▶ renewed with the refresh token
+```
+
+Access tokens live 60 to 90 minutes and are renewed shortly before they run out. A connection
+already established is not affected when its token expires, because the database checks the
+token only when a connection signs in. You have to sign in again only when:
+
+- **the server restarts**, because tokens are kept in memory only and never written to disk;
+- **Entra refuses the refresh token**, for example when your organisation's sign-in frequency runs
+  out, after a password change or when your sessions are revoked. The account then turns to
+  `SIGN_IN_REQUIRED`, and the status page shows Entra's reason.
+
+**Signing out** on the status page forgets the tokens and closes the pooled connections, so that
+nothing keeps using the sign-in.
+
+#### The client ID
+
+Signing in needs an application registered in Entra ID. The default `client-id` is the public
+client of the Azure CLI, `04b07795-8ddb-461a-bbee-02f9e1bf7b46`, which every tenant already knows
+and which may request tokens for Azure databases. No registration and no administrator consent
+are needed, and the Azure identity libraries use the same default. Sign-ins then appear in the
+Entra logs as the Azure CLI, and the same Conditional Access policies apply.
+
+If your organisation wants tools to use a registration of their own, register a public client
+with the redirect URI `http://localhost` and the delegated permission *Azure OSSRDBMS Database →
+user_impersonation*, and put its ID into `client-id`.
+
+Entra answers on the root of the server, `http://localhost:<port>/`, because that is the
+redirect URI the Azure CLI registers: `localhost` with any port and no path. The port is the one
+your browser used to open the status page, so a container port published under another number
+works as well.
 
 ### Grafana
 
@@ -218,7 +299,7 @@ One setting applies to the whole server and sits directly under `mcp-hub`:
 
 | Tool | Environments | Purpose |
 |---|---|---|
-| `list_environments` | all | Every environment with its type, description, state, since when it holds, the last error, whether it is read-only and pool usage. |
+| `list_environments` | all | Every environment with its type, description, state, since when it holds, the last error, whether it is read-only and pool usage, and for an Entra environment the state of its sign-in. |
 | `run_sql_query` | databases | Runs one query in a read-only transaction and returns the rows. |
 | `describe_table` | databases | Columns with types as DDL writes them, nullability, keys, check constraints and indexes, for several tables at once. |
 | `search_schema` | databases | Finds tables, views, columns and stored programs whose name contains a fragment. |
@@ -258,11 +339,11 @@ why.
 
 ## Status page
 
-![Status page with two reachable PostgreSQL databases, an unreachable Oracle database and an unreachable Grafana instance](docs/status-page.png)
+![Status page with reachable and unreachable environments, an Azure database waiting for its Entra sign-in and the Entra account offering to sign in](docs/status-page.png)
 
 | Address | Content |
 |---|---|
-| <http://127.0.0.1:8282/status> | Every environment with its state, since when it holds, access mode, pool usage and last error. Refreshes itself every 10 seconds. `/` redirects here. |
+| <http://127.0.0.1:8282/status> | Every environment with its state, since when it holds, access mode, pool usage and last error, and every Entra account with its state, user, token expiry, last refresh and last error, with a button to sign in or out. Refreshes itself every 10 seconds. `/` redirects here. |
 | <http://127.0.0.1:8282/status.json> | The same as JSON, for scripts and monitoring. |
 
 ## Logging
@@ -280,6 +361,8 @@ tie them together when sessions interleave:
 Arguments are logged shortened to one line, so a query's text appears in the log. A change of an
 environment's state is logged once, when it happens, not on every probe. Every committed write
 is logged with its whole statement, and every change made in Grafana with its method and endpoint.
+Every Entra sign-in and sign-out is logged with the account, the user and the tenant, and so is a
+refresh token Entra refuses. Tokens never appear in the log.
 
 ## Running
 
@@ -398,6 +481,8 @@ The decisions behind it:
   that a dead connection cannot block the pool.
 - **Credentials never leave the configuration.** They are not part of the URL, not part of the
   resolved settings the tools see, and not part of any message or log line.
+- **Entra tokens stay in memory.** The refresh token is a lasting key to the database, so it is
+  never written to disk; signing in again after a restart is the price.
 - **No schema cache.** A filtered data dictionary query answers in a fraction of a second even
   over hundreds of thousands of columns, so there is nothing a cache would save and nothing to
   go stale.
@@ -456,6 +541,13 @@ and `latest`.
   `AL32UTF8`, which the thin driver handles on its own, so no test can fail the way a database on
   a regional character set would. The `orai18n` dependency covers that case; without it such a
   database refuses every connection with `ORA-17056`.
+- **The sign-in to Entra ID itself is not tested automatically.** No test can sign in to a real
+  directory, so the tests put a stand-in in place of Entra and let the database accept its token
+  as a password. Everything around the sign-in is covered that way: renewing, refusing, signing
+  out and tagging connections. The conversation with Entra and your organisation's Conditional
+  Access policies are verified by hand only.
+- **Entra sign-in is for Azure Database for PostgreSQL only.** The token is requested for the
+  resource Azure's open-source databases share; Oracle and Grafana do not accept it.
 - **A running statement cannot be cancelled** from the client. It ends at the query timeout,
   because the MCP Java SDK the server is built on does not handle the protocol's cancellation
   notification yet.

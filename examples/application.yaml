@@ -52,3 +52,19 @@ mcp-hub:
       # server sees: inside the container this directory is mounted at /config.
       # ca-file: /config/certs/internal-ca.pem
       read-only: true
+
+    # A database on Azure reached with your own Microsoft Entra ID sign-in instead of a password.
+    # Sign in on the status page; the server renews the token on its own. See the README.
+    # AZURE_REPORTING_DB:
+    #   type: POSTGRESQL
+    #   description: >-
+    #     Reporting database on Azure. Use it for monthly figures.
+    #   url: jdbc:postgresql://reporting.postgres.database.azure.com:5432/reporting?sslmode=require
+    #   username: app_readers
+    #   authentication: ENTRA
+    #   entra-account: WORK
+
+  # entra-accounts:
+  #   WORK:
+  #     tenant-id: 00000000-0000-0000-0000-000000000000
+  #     expected-user: you@example.com
