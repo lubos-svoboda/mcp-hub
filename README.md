@@ -388,7 +388,7 @@ why.
 
 | Address | Content |
 |---|---|
-| <http://127.0.0.1:8282/status> | Every environment with its state, since when it holds, access mode, pool usage and last error, and every Entra account with its state, user, token expiry, last refresh and last error, with a button to sign in or out. *Check now* checks every environment at once and *Check* one of them; while a check runs the page reloads every 2 seconds, otherwise every 10, and times read as how long ago or how soon they are, in your browser's language. `/` redirects here. |
+| <http://127.0.0.1:8282/status> | Every environment with its state, since when it holds, access mode, pool usage and last error, and every Entra account with its state, user, token expiry, last refresh, last error and password file, with a button to sign in or out. *Check now* checks every environment at once and *Check* one of them; while a check runs the page reloads every 2 seconds, otherwise every 10, and times read as how long ago or how soon they are, in your browser's language. `/` redirects here. |
 | <http://127.0.0.1:8282/status.json> | The same as JSON, for scripts and monitoring. |
 
 ## Logging

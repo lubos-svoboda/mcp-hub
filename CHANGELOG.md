@@ -6,10 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-24
+
 ### Added
 
 - `pgpass-file` on an Entra account writes its current token into a PostgreSQL password file, so
   that psql, an IDE or another client reaches the same databases without a sign-in of its own.
+- The status page shows for each Entra account where it writes its token, when it last did and why
+  it could not.
+
+### Fixed
+
+- Building from a checkout on a machine without the git command failed; the version is then
+  0.0.0-dev, as for a build without git history.
 
 ## [0.2.0] - 2026-09-24
 
@@ -46,7 +55,8 @@ All notable changes to this project are documented here. The format follows
 - Versions come from git tags; images for `linux/amd64` and `linux/arm64` are published to
   `ghcr.io/lubos-svoboda/mcp-hub`.
 
-[Unreleased]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/lubos-svoboda/mcp-hub/releases/tag/v0.1.0
