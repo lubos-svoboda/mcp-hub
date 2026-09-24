@@ -248,6 +248,8 @@ why.
 
 ## Status page
 
+![Status page with two reachable PostgreSQL databases, an unreachable Oracle database and an unreachable Grafana instance](docs/status-page.png)
+
 | Address | Content |
 |---|---|
 | <http://127.0.0.1:8282/status> | Every environment with its state, since when it holds, access mode, pool usage and last error. Refreshes itself every 10 seconds. `/` redirects here. |
@@ -303,15 +305,19 @@ values to the container as environment variables.
 ### Without Docker
 
 Any JDK from 17 on runs the Gradle wrapper, which fetches everything else, including a Java 25
-toolchain for the build when none is installed. The credentials have to be in the environment:
+toolchain for the build when none is installed. The server reads `secrets.env` itself, as a
+properties file:
 
 ```bash
-set -a; . ~/.mcp-hub/secrets.env; set +a
-SPRING_CONFIG_ADDITIONAL_LOCATION=file:$HOME/.mcp-hub/application.yaml ./gradlew bootRun
+./gradlew bootRun --args="--spring.config.additional-location=file:$HOME/.mcp-hub/application.yaml --spring.config.import=file:$HOME/.mcp-hub/secrets.env[.properties]"
 ```
 
 The server then listens on `127.0.0.1:8282`. Certificate paths in `ca-file` are paths on your
 machine in this case, not under `/config`.
+
+A backslash in `secrets.env` means something different in each case: Docker Compose takes it
+literally, while the properties format treats it as the start of an escape sequence. Without
+Docker, write a password containing a backslash with the backslash doubled.
 
 ## Connecting a client
 
