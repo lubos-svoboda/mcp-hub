@@ -26,8 +26,8 @@ shared by every client session on the machine.
   work only on environments configured as writable.
 - **Guarded answers.** Limits on rows, answer size, text length and query time, per environment,
   and every answer says when a limit cut something off.
-- **Schema tools:** table descriptions, name search, stored program and view source and execution plans,
-  answered straight from the data dictionary with no cache to build or go stale.
+- **Schema tools:** table descriptions, name search, stored program and view source and
+  execution plans, answered straight from the data dictionary with no cache to build or go stale.
 - **A log line for every call** with its arguments, duration and outcome.
 
 ## Why
@@ -373,23 +373,25 @@ The decisions behind it:
 
 ```bash
 ./gradlew test             # unit tests, seconds
-./gradlew integrationTest  # real Oracle and PostgreSQL in Docker, a few minutes
+./gradlew integrationTest  # real Oracle, PostgreSQL, Grafana and Loki in Docker, a few minutes
 ```
 
 The integration tests cover what unit tests cannot: that a write is refused by the database
-itself, that values keep their type and precision, that Czech diacritics survive both ways, and
-that an environment recovers on its own after its database goes away and comes back.
+itself, that values keep their type and precision, that Czech diacritics survive both ways, that
+an environment recovers on its own after its database goes away and comes back, and that logs
+are read from Loki through Grafana's datasource proxy with a token of the Viewer role.
 
 ## Limitations
 
 - **Meant for localhost.** There is no authentication; keep the port bound to the loopback
   interface.
-- **Grafana has no integration test.** Its tools are verified against real instances only.
 - **Character sets are covered by a dependency, not a test.** The test database runs on
   `AL32UTF8`, which the thin driver handles on its own, so no test can fail the way a database on
   a regional character set would. The `orai18n` dependency covers that case; without it such a
   database refuses every connection with `ORA-17056`.
-- **A running statement cannot be cancelled** from the client. It ends at the query timeout.
+- **A running statement cannot be cancelled** from the client. It ends at the query timeout,
+  because the MCP Java SDK the server is built on does not handle the protocol's cancellation
+  notification yet.
 
 ## License
 

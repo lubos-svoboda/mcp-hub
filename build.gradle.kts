@@ -66,7 +66,7 @@ kotlin {
 	}
 }
 
-// Tests needing a real Oracle in Docker take minutes, so they stay out of the everyday loop.
+// Tests needing real servers in Docker take minutes, so they stay out of the everyday loop.
 // Run them with `gradlew integrationTest`.
 tasks.test {
 	useJUnitPlatform {
@@ -76,7 +76,7 @@ tasks.test {
 
 tasks.register<Test>("integrationTest") {
 	group = "verification"
-	description = "Runs the tests that need a real Oracle database in Docker."
+	description = "Runs the tests that need a real database or Grafana in Docker."
 	testClassesDirs = sourceSets.test.get().output.classesDirs
 	classpath = sourceSets.test.get().runtimeClasspath
 	useJUnitPlatform {
