@@ -22,7 +22,7 @@ class EntraAccountTest {
 
         val failure = assertThrows<EntraSignInRequiredException> { account.accessToken() }
 
-        assertThat(failure.message).isEqualTo("Entra account WORK is not signed in; sign in on the status page.")
+        assertThat(failure.message).isEqualTo("Entra account WORK is not signed in; sign in at http://localhost:8282/status.")
         assertThat(account.status().state).isEqualTo(EntraAccountState.SIGNED_OUT)
     }
 
@@ -64,7 +64,7 @@ class EntraAccountTest {
 
         val failure = assertThrows<EntraSignInRequiredException> { account.accessToken() }
 
-        assertThat(failure.message).startsWith("Entra account WORK must sign in again on the status page.")
+        assertThat(failure.message).startsWith("Entra account WORK must sign in again at http://localhost:8282/status.")
         assertThat(failure.message).contains("invalid_grant")
         assertThat(account.status().state).isEqualTo(EntraAccountState.SIGN_IN_REQUIRED)
         assertThrows<EntraSignInRequiredException> { account.requireSignedIn() }
@@ -134,7 +134,13 @@ class EntraAccountTest {
     private fun signedIn() = account().also { it.completeSignIn("code", REDIRECT_URI, "verifier") }
 
     private fun account(expectedUser: String? = null) =
-        EntraAccount("WORK", EntraAccountProperties(tenantId = TENANT_ID, expectedUser = expectedUser), tokenClient, clock)
+        EntraAccount(
+            "WORK",
+            EntraAccountProperties(tenantId = TENANT_ID, expectedUser = expectedUser),
+            tokenClient,
+            "http://localhost:8282/status",
+            clock,
+        )
 
     private companion object {
         const val REDIRECT_URI = "http://localhost:8282/"

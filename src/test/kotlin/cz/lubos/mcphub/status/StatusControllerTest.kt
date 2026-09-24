@@ -57,6 +57,14 @@ class StatusControllerTest {
         assertThat(page).contains("<h2>Entra accounts</h2>")
         assertThat(page).contains("""<a class="button" href="/entra/sign-in/WORK">Sign in</a>""")
         assertThat(page).contains("Entra WORK")
+        assertThat(page).contains("""<div class="banner">Entra account <strong>WORK</strong> is not signed in, so 1""")
+    }
+
+    @Test
+    fun `a signed-in account leaves no banner`() {
+        accounts.requireAccount("WORK").completeSignIn("code", "http://localhost:8282/", "verifier")
+
+        assertThat(controller.statusAsPage()).doesNotContain("""<div class="banner">""")
     }
 
     @Test

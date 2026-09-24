@@ -198,7 +198,8 @@ mcp-hub:
   often knows only the group it was reached as, and this tells who is behind a session.
 
 **Signing in.** Until an account is signed in, its environments are down with the reason
-`Entra account WORK is not signed in; sign in on the status page.`
+`Entra account WORK is not signed in; sign in at http://localhost:8282/status.`, so an assistant
+can pass the address on, and a banner at the top of the status page offers the sign-in.
 
 ```
 /status ─ Sign in ─▶ Microsoft sign-in in your browser (MFA, …) ─▶ back to /status
@@ -289,11 +290,12 @@ mcp-hub:
 | `pool.keepalive-seconds` | 120 | How often an idle connection is exercised. |
 | `pool.validation-timeout-seconds` | 5 | How long a liveness check may take. |
 
-Two settings apply to the whole server and sit directly under `mcp-hub`:
+A few settings apply to the whole server and sit directly under `mcp-hub`:
 
 | Setting | Default | Purpose |
 |---|---|---|
 | `probe.interval-seconds` | 15 | How often every environment is checked. |
+| `status-page-url` | `http://localhost:8282/status` | Where a browser reaches the status page. Messages asking for an Entra sign-in name it, so set it when the port is published under another number. |
 | `allowed-hosts` | `localhost`, `127.0.0.1`, `::1` | Host names the server answers to. Add one, for example `host.docker.internal`, only when a client reaches the server under that name. |
 
 ## Tools

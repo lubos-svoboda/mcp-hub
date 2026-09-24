@@ -33,6 +33,7 @@ class EntraAccount(
     val name: String,
     private val properties: EntraAccountProperties,
     private val tokenClient: EntraTokenClient,
+    private val statusPageUrl: String,
     private val clock: Clock = Clock.systemUTC(),
 ) {
 
@@ -155,8 +156,8 @@ class EntraAccount(
     private fun signInRequiredMessage(): String {
         val reason = status.lastError?.let { " Last error: $it" } ?: ""
         return when (status.state) {
-            EntraAccountState.SIGN_IN_REQUIRED -> "Entra account $name must sign in again on the status page.$reason"
-            else -> "Entra account $name is not signed in; sign in on the status page."
+            EntraAccountState.SIGN_IN_REQUIRED -> "Entra account $name must sign in again at $statusPageUrl.$reason"
+            else -> "Entra account $name is not signed in; sign in at $statusPageUrl."
         }
     }
 

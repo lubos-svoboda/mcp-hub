@@ -14,7 +14,13 @@ class EntraAccountRegistry(
     private val accountsByName: Map<String, EntraAccount> =
         hubProperties.entraAccounts.mapValues { (accountName, accountProperties) ->
             require(accountProperties.tenantId.isNotBlank()) { "Entra account $accountName needs a tenant-id." }
-            EntraAccount(accountName, accountProperties, tokenClientFactory.create(accountProperties), clock)
+            EntraAccount(
+                accountName,
+                accountProperties,
+                tokenClientFactory.create(accountProperties),
+                hubProperties.statusPageUrl,
+                clock,
+            )
         }
 
     fun all(): Collection<EntraAccount> = accountsByName.values

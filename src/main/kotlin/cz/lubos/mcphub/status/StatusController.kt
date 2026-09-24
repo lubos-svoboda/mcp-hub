@@ -35,7 +35,8 @@ class StatusController(
     /** A page to glance at, refreshing itself so it can be left open on a second screen. */
     @GetMapping("/status", produces = [MediaType.TEXT_HTML_VALUE])
     fun statusAsPage(): String {
-        val rows = environmentStatusReporter.report().joinToString("\n") { view ->
+        val environments = environmentStatusReporter.report()
+        val rows = environments.joinToString("\n") { view ->
             """
             <tr class="${view.state.name.lowercase()}">
               <td>${escape(view.name)}<div class="note">${escape(view.description)}</div></td>
@@ -82,6 +83,18 @@ class StatusController(
             """.trimIndent()
         }
 
+        // An account waiting for its sign-in keeps its environments down, so it leads the page.
+        val banners = entraAccounts.filter { it.state != EntraAccountState.SIGNED_IN }.joinToString("\n") { account ->
+            val waiting = environments.count { it.entra?.account == account.account }
+            val what = if (account.state == EntraAccountState.SIGN_IN_REQUIRED) "must sign in again" else "is not signed in"
+            val path = URLEncoder.encode(account.account, StandardCharsets.UTF_8)
+            """
+            <div class="banner">Entra account <strong>${escape(account.account)}</strong> $what, so $waiting
+              environment${if (waiting == 1) "" else "s"} cannot connect.
+              <a class="button" href="/entra/sign-in/$path">Sign in</a></div>
+            """.trimIndent()
+        }
+
         // While a round runs the page reloads quickly, so the outcome shows as soon as it is known.
         val probing = connectionProbe.isProbing
         val reloadSeconds = if (probing) 2 else 10
@@ -122,6 +135,9 @@ class StatusController(
                 @keyframes countdown { to { --elapsed: 100%; } }
                 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
                 h2 { font-size: 1rem; margin: 2rem 0 .5rem; }
+                .banner { display: flex; align-items: center; gap: .6rem; margin: 0 0 1rem; padding: .6rem .8rem;
+                  border: 1px solid #e6c65c; border-radius: 6px; background: #fff8dc; }
+                .banner .button { margin-left: auto; }
                 tr.signed_in .state { color: #197d3a; }
                 tr.sign_in_required .state { color: #b3261e; }
                 tr.signed_out .state { color: #8a6d00; }
@@ -140,6 +156,7 @@ class StatusController(
                   tr.signed_out .state { color: #d9b03a; }
                   .button, button { background: #26282c; border-color: #3a3d42; }
                   .countdown { background: conic-gradient(#bbb var(--elapsed), #3a3d42 0); }
+                  .banner { background: #2f2a17; border-color: #6b5a1e; }
                   .spinner { border-color: #3a3d42; border-top-color: #bbb; }
                 }
               </style>
@@ -150,6 +167,7 @@ class StatusController(
                 <span class="probe">$probeState</span>
                 <form method="post" action="/status/check"><button type="submit">Check now</button></form>
               </header>
+              $banners
               <table>
                 <tr><th>Environment</th><th>Type</th><th>State</th><th>Since</th><th>Access</th><th>Pool</th><th>Last error</th></tr>
                 $rows
