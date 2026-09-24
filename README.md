@@ -1,5 +1,8 @@
 # MCP Hub
 
+[![Build](https://github.com/lubos-svoboda/mcp-hub/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/lubos-svoboda/mcp-hub/actions/workflows/build.yml)
+[![Version](https://img.shields.io/github/v/tag/lubos-svoboda/mcp-hub?sort=semver&label=version)](https://github.com/lubos-svoboda/mcp-hub/pkgs/container/mcp-hub)
+
 One long-running [MCP](https://modelcontextprotocol.io) server that gives AI assistants access
 to several Oracle and PostgreSQL databases and Grafana instances through a single set of tools,
 shared by every client session on the machine.
