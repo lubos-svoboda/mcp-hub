@@ -1,0 +1,54 @@
+# Copy this directory to ~/.mcp-hub/ and adjust it. Credentials are not written here: each one
+# refers to a variable defined in secrets.env next to this file.
+
+mcp-hub:
+  # Optional. These are the built-in defaults; override only what you need.
+  defaults:
+    max-rows: 500
+    query-timeout-seconds: 60
+
+  environments:
+    ORACLE_SALES_DB:
+      type: ORACLE
+      description: >-
+        Sales system, production copy refreshed nightly. Use it for questions about orders,
+        invoices and customers; the reference data for products lives in POSTGRES_CATALOG_DB.
+      url: jdbc:oracle:thin:@//oracle.example.internal:1521/SALES
+      username: ${ORACLE_SALES_USERNAME}
+      password: ${ORACLE_SALES_PASSWORD}
+      schema: SALES
+      read-only: true
+      max-rows: 200
+      pool:
+        maximum-size: 3
+
+    POSTGRES_CATALOG_DB:
+      type: POSTGRESQL
+      description: >-
+        Product catalogue. Use it for products, prices and stock levels.
+      url: jdbc:postgresql://postgres.example.internal:5432/catalog
+      username: ${POSTGRES_CATALOG_USERNAME}
+      password: ${POSTGRES_CATALOG_PASSWORD}
+      schema: catalog
+      read-only: true
+
+    POSTGRES_LOCAL_DB:
+      type: POSTGRESQL
+      description: >-
+        Local development database. The only place where changes are allowed.
+      # host.docker.internal is the machine running Docker; use localhost without Docker.
+      url: jdbc:postgresql://host.docker.internal:5432/catalog
+      username: ${POSTGRES_LOCAL_USERNAME}
+      password: ${POSTGRES_LOCAL_PASSWORD}
+      read-only: false
+
+    GRAFANA_PROD:
+      type: GRAFANA
+      description: >-
+        Production monitoring. Use it for application logs and dashboards of the live system.
+      url: https://grafana.example.internal/
+      token: ${GRAFANA_PROD_TOKEN}
+      # Only needed when the certificate is signed by a private authority. The path is the one the
+      # server sees: inside the container this directory is mounted at /config.
+      # ca-file: /config/certs/internal-ca.pem
+      read-only: true

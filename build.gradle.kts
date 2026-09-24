@@ -1,0 +1,77 @@
+plugins {
+	kotlin("jvm") version "2.3.21"
+	kotlin("plugin.spring") version "2.3.21"
+	id("org.springframework.boot") version "4.1.1"
+	id("io.spring.dependency-management") version "1.1.7"
+}
+
+group = "cz.lubos"
+version = "0.0.1-SNAPSHOT"
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+// Without this, build/libs also holds a plain library jar that the Dockerfile's COPY
+// would match alongside the executable one.
+tasks.jar {
+	enabled = false
+}
+
+dependencyManagement {
+	imports {
+		mavenBom("org.springframework.ai:spring-ai-bom:2.0.1")
+		mavenBom("org.testcontainers:testcontainers-bom:1.21.4")
+	}
+}
+
+dependencies {
+	implementation("org.springframework.ai:spring-ai-starter-mcp-server-webmvc")
+	implementation("org.springframework.boot:spring-boot-starter-jdbc")
+	implementation("org.springframework.boot:spring-boot-starter-aspectj")
+	implementation("org.jetbrains.kotlin:kotlin-reflect")
+	// Grafana answers are large and the useful part is small; jq narrows them at the source.
+	implementation("net.thisptr:jackson-jq:1.6.5")
+	runtimeOnly("org.postgresql:postgresql")
+	runtimeOnly("com.oracle.database.jdbc:ojdbc17")
+	// The thin driver only knows a handful of character sets on its own. Without this a
+	// database using, for example, EE8ISO8859P2 refuses every connection with ORA-17056.
+	runtimeOnly("com.oracle.database.nls:orai18n:23.26.3.0.0")
+	testImplementation("org.springframework.boot:spring-boot-starter-test")
+	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+	testImplementation("org.testcontainers:junit-jupiter")
+	testImplementation("org.testcontainers:oracle-free")
+	testImplementation("org.testcontainers:postgresql")
+	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+kotlin {
+	compilerOptions {
+		freeCompilerArgs.addAll("-Xjsr305=strict", "-Xannotation-default-target=param-property")
+	}
+}
+
+// Tests needing a real Oracle in Docker take minutes, so they stay out of the everyday loop.
+// Run them with `gradlew integrationTest`.
+tasks.test {
+	useJUnitPlatform {
+		excludeTags("integration")
+	}
+}
+
+tasks.register<Test>("integrationTest") {
+	group = "verification"
+	description = "Runs the tests that need a real Oracle database in Docker."
+	testClassesDirs = sourceSets.test.get().output.classesDirs
+	classpath = sourceSets.test.get().runtimeClasspath
+	useJUnitPlatform {
+		includeTags("integration")
+	}
+	shouldRunAfter(tasks.test)
+}

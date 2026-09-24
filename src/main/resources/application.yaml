@@ -1,0 +1,20 @@
+server:
+  address: 127.0.0.1
+  port: 8282
+
+spring:
+  application:
+    name: mcphub
+  ai:
+    mcp:
+      server:
+        protocol: STREAMABLE
+        name: mcp-hub
+        version: 0.0.1
+        type: SYNC
+
+# Defaults for probing, query limits and pool sizing live in HubProperties.kt and are
+# not repeated here. Override them under mcp-hub.defaults, or per environment.
+#
+# Environments carry credentials and are therefore never defined in this file. Supply
+# them from an external configuration file or from environment variables.

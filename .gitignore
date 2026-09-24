@@ -1,0 +1,61 @@
+HELP.md
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Kotlin ###
+.kotlin
+
+### MCP Hub ###
+# Internal requirements document, not part of the published project
+REQUIREMENTS.md
+# Local configuration and credentials must never be committed. The leading slash matters:
+# without it the pattern would also exclude the source package named config.
+*.env
+!/examples/secrets.env
+application-local.yaml
+/config/
+# Private keys, certificates and keystores
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+
+### OS ###
+.DS_Store
+Thumbs.db

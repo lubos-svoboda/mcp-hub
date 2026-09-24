@@ -1,0 +1,8 @@
+# Only the sources and the Gradle wrapper are needed; everything else would only slow the build
+# down or, worse, carry local credentials into the image.
+*
+!gradlew
+!gradle/
+!settings.gradle.kts
+!build.gradle.kts
+!src/
