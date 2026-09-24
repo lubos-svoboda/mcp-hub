@@ -528,7 +528,9 @@ The version comes from git tags, so no file holds it:
 
 The server reports it to every client when a session starts.
 
-To release, tag the commit and push the tag:
+To release, move the entries under `[Unreleased]` in [`CHANGELOG.md`](CHANGELOG.md) into a section
+for the new version, commit it, then tag the commit and push the tag. A tag without its section
+in the changelog is refused before anything is published:
 
 ```bash
 git tag v0.2.0
@@ -537,7 +539,7 @@ git push origin v0.2.0
 
 The [release workflow](.github/workflows/release.yml) then runs every test and publishes the
 image for `linux/amd64` and `linux/arm64` to `ghcr.io/lubos-svoboda/mcp-hub` as `0.2.0`, `0.2`
-and `latest`. It then creates a GitHub Release listing the commits since the previous tag.
+and `latest`. It then creates a GitHub Release from the version's section of [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Limitations
 

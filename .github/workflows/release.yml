@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Before anything is built or published, so a missing changelog section stops the release early.
+      - run: bash .github/release-notes.sh "${GITHUB_REF_NAME#v}" "ghcr.io/$GITHUB_REPOSITORY" > /dev/null
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -52,8 +54,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: VERSION=${{ steps.meta.outputs.version }}
 
-  # Commits go straight to main rather than through pull requests, so the notes list the commits
-  # since the previous tag instead of relying on GitHub's pull-request based notes.
+  # The notes are the version's section of CHANGELOG.md; a tag without one fails here, so the
+  # changelog cannot be forgotten.
   release:
     needs: image
     runs-on: ubuntu-latest
@@ -61,19 +63,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          previous=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "$GITHUB_REF_NAME^" 2>/dev/null || true)
-          {
-            echo "\`\`\`bash"
-            echo "docker pull ghcr.io/$GITHUB_REPOSITORY:${GITHUB_REF_NAME#v}"
-            echo "\`\`\`"
-            echo
-            echo "## Changes${previous:+ since $previous}"
-            echo
-            git log --no-merges --format='- %s' "${previous:+$previous..}$GITHUB_REF_NAME"
-          } > notes.md
+          bash .github/release-notes.sh "${GITHUB_REF_NAME#v}" "ghcr.io/$GITHUB_REPOSITORY" > notes.md
           gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag
