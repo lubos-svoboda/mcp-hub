@@ -71,6 +71,11 @@ class EntraAccount(
         }
     }
 
+    fun recordSignInFailure(reason: String) {
+        status = status.copy(lastError = "Sign-in failed: $reason")
+        logger.warn("Entra account {} could not sign in: {}", name, reason)
+    }
+
     /** Fails at once when nobody is signed in, so a caller does not wait for a pool that cannot connect. */
     fun requireSignedIn() {
         if (token == null) {
