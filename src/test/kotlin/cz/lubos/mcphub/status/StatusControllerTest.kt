@@ -121,7 +121,7 @@ class StatusControllerTest {
         val afterwards = page.statusAsPage()
 
         assertThat(whileChecking).contains("Checking environments").contains("""content="2"""")
-        assertThat(afterwards).contains("""Checked at <time datetime="20""").contains("countdown").contains("""content="10"""").doesNotContain("spinner\"")
+        assertThat(afterwards).contains("""Checked <time datetime="20""").contains("countdown").contains("""content="10"""").doesNotContain("spinner\"")
     }
 
     private companion object {

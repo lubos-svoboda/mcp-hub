@@ -5,7 +5,9 @@ import cz.lubos.mcphub.target.ConnectionProbe
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RestController
 import java.net.URI
@@ -29,6 +31,16 @@ class StatusController(
         return ResponseEntity.status(HttpStatus.SEE_OTHER).location(URI.create("/status")).build()
     }
 
+    @PostMapping("/status/check/{environmentName}")
+    fun checkOne(@PathVariable environmentName: String): ResponseEntity<Void> {
+        connectionProbe.probeInBackground(environmentName)
+        return ResponseEntity.status(HttpStatus.SEE_OTHER).location(URI.create("/status")).build()
+    }
+
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun refused(refusal: IllegalArgumentException): ResponseEntity<String> =
+        ResponseEntity.badRequest().contentType(MediaType.TEXT_PLAIN).body(refusal.message)
+
     @GetMapping("/status.json", produces = [MediaType.APPLICATION_JSON_VALUE])
     fun statusAsJson(): List<EnvironmentView> = environmentStatusReporter.report()
 
@@ -41,7 +53,7 @@ class StatusController(
             <tr class="${view.state.name.lowercase()}">
               <td>${escape(view.name)}<div class="note">${escape(view.description)}</div></td>
               <td>${view.type}</td>
-              <td class="state">${view.state}</td>
+              <td class="state">${view.state}<form method="post" action="/status/check/${URLEncoder.encode(view.name, StandardCharsets.UTF_8)}"><button type="submit" class="small" title="Check this environment now">Check</button></form></td>
               <td>${time(view.since)}</td>
               <td>${if (view.readOnly) "read-only" else "<strong>writable</strong>"}${view.entra?.let { "<div class=\"note\">Entra ${escape(it.account)}</div>" } ?: ""}</td>
               <td>${view.pool?.let { "${it.active} active / ${it.idle} idle / ${it.total} total" } ?: "—"}</td>
@@ -102,7 +114,7 @@ class StatusController(
             """<span class="spinner" aria-hidden="true"></span>Checking environments…"""
         } else {
             """<span class="countdown" style="animation-duration: ${reloadSeconds}s" title="The page reloads every $reloadSeconds s"></span>""" +
-                "Checked at ${time(connectionProbe.lastRoundFinishedAt()?.toString())}"
+                "Checked ${time(connectionProbe.lastRoundFinishedAt()?.toString())}"
         }
 
         return """
@@ -138,6 +150,7 @@ class StatusController(
                 .banner { display: flex; align-items: center; gap: .6rem; margin: 0 0 1rem; padding: .6rem .8rem;
                   border: 1px solid #e6c65c; border-radius: 6px; background: #fff8dc; }
                 .banner .button { margin-left: auto; }
+                button.small { display: block; margin-top: .25rem; padding: 0 .45rem; font-size: .8em; font-weight: normal; }
                 tr.signed_in .state { color: #197d3a; }
                 tr.sign_in_required .state { color: #b3261e; }
                 tr.signed_out .state { color: #8a6d00; }
@@ -174,10 +187,16 @@ class StatusController(
               </table>
               $entraSection
               <script>
-                // The server knows neither the reader's language nor time zone; the browser does.
+                // The server knows neither the reader's language nor time zone; the browser does. A time
+                // reads as how long ago or how soon it is, with the exact moment shown on hover.
+                const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+                const units = [['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1]];
                 for (const element of document.querySelectorAll('time[datetime]')) {
-                  element.textContent = new Date(element.dateTime)
-                    .toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' });
+                  const moment = new Date(element.dateTime);
+                  const seconds = Math.round((moment.getTime() - Date.now()) / 1000);
+                  const [unit, size] = units.find(([, length]) => Math.abs(seconds) >= length) ?? units[units.length - 1];
+                  element.textContent = relative.format(Math.round(seconds / size), unit);
+                  element.title = moment.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' });
                 }
               </script>
             </body>

@@ -67,6 +67,20 @@ class ConnectionProbe(
         Thread.ofVirtual().name("requested-probe").start { probeRound() }
     }
 
+    /** Checks one target at once, for when only that one is awaited. */
+    fun probeInBackground(environmentName: String) {
+        val target = allTargets().firstOrNull { it.name == environmentName }
+            ?: throw IllegalArgumentException("Unknown environment '$environmentName'.")
+        roundsRunning.incrementAndGet()
+        Thread.ofVirtual().name("requested-probe").start {
+            try {
+                probe(target)
+            } finally {
+                roundsRunning.decrementAndGet()
+            }
+        }
+    }
+
     /** Each target on a thread of its own, so an unreachable one cannot hold up the others. */
     private fun probeRound() {
         try {

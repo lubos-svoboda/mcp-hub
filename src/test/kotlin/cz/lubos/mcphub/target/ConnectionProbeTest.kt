@@ -9,6 +9,7 @@ import cz.lubos.mcphub.config.ProbeProperties
 import cz.lubos.mcphub.database.EnvironmentRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -90,6 +91,23 @@ class ConnectionProbeTest {
 
         assertThat(probe.statusOf("SLOW_DB")?.connectionState).isEqualTo(ConnectionState.UP)
         assertThat(probe.statusOf("FAST_DB")?.connectionState).isEqualTo(ConnectionState.UP)
+    }
+
+    @Test
+    fun `a single environment can be checked without the others`() {
+        val registry = object : TargetRegistry {
+            override fun targets(): Collection<ProbeTarget> = listOf(StubTarget("FIRST_DB") {}, StubTarget("SECOND_DB") {})
+        }
+        val probe = ConnectionProbe(listOf(registry), hubProperties)
+
+        probe.probeInBackground("FIRST_DB")
+        while (probe.isProbing) {
+            Thread.sleep(10)
+        }
+
+        assertThat(probe.statusOf("FIRST_DB")?.connectionState).isEqualTo(ConnectionState.UP)
+        assertThat(probe.statusOf("SECOND_DB")?.connectionState).isEqualTo(ConnectionState.CONNECTING)
+        assertThrows<IllegalArgumentException> { probe.probeInBackground("NO_SUCH_DB") }
     }
 
     private class StubTarget(override val name: String, private val check: () -> Unit) : ProbeTarget {
