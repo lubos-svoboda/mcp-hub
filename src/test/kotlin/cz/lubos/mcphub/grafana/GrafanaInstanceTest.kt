@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.io.IOException
 import java.net.URI
 import java.net.http.HttpClient
 
@@ -44,8 +45,25 @@ class GrafanaInstanceTest {
         assertThat(failure.message).contains("single slash")
     }
 
+    /** Nothing listens on port 1, and the HTTP client reports that with no message of its own. */
+    @Test
+    fun `an unreachable instance is reported with its address and the reason`() {
+        val unreachableInstance = GrafanaInstance(
+            settings = instance.settings,
+            baseUrl = UNREACHABLE_URL,
+            token = "token",
+            httpClient = HttpClient.newHttpClient(),
+        )
+
+        val failure = assertThrows<IOException> { unreachableInstance.checkReachable() }
+
+        // The causes below ConnectException differ between operating systems.
+        assertThat(failure.message).startsWith("Grafana at $UNREACHABLE_URL could not be reached: ConnectException")
+    }
+
     private companion object {
         const val INSTANCE_NAME = "GRAFANA_TEST"
         const val BASE_URL = "https://grafana.example.internal/grafana/"
+        const val UNREACHABLE_URL = "http://127.0.0.1:1"
     }
 }

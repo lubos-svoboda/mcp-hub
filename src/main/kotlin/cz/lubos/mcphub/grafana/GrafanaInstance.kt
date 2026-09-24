@@ -3,6 +3,7 @@ package cz.lubos.mcphub.grafana
 import cz.lubos.mcphub.config.EnvironmentSettings
 import cz.lubos.mcphub.config.EnvironmentType
 import cz.lubos.mcphub.target.ProbeTarget
+import java.io.IOException
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -80,6 +81,17 @@ class GrafanaInstance(
                 }
             }
             .build()
-        return httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+        return try {
+            httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+        } catch (failure: IOException) {
+            // The HTTP client reports an unreachable host without any message, not even the address.
+            throw IOException("Grafana at $baseUri could not be reached: ${describe(failure)}", failure)
+        }
     }
+
+    private fun describe(failure: Throwable): String =
+        generateSequence(failure) { it.cause }
+            .map { it.message?.takeIf(String::isNotBlank) ?: it.javaClass.simpleName }
+            .distinct()
+            .joinToString(": ")
 }
