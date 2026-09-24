@@ -299,7 +299,7 @@ A few settings apply to the whole server and sit directly under `mcp-hub`:
 |---|---|---|
 | `probe.interval-seconds` | 15 | How often every environment is checked. |
 | `status-page-url` | `http://localhost:8282/status` | Where a browser reaches the status page. Messages asking for an Entra sign-in name it, so set it when the port is published under another number. |
-| `allowed-hosts` | `localhost`, `127.0.0.1`, `::1` | Host names the server answers to. Add one, for example `host.docker.internal`, only when a client reaches the server under that name. |
+| `additional-allowed-hosts` | none | Host names the server answers to besides `localhost`, `127.0.0.1` and `::1`, which it always answers to. Add one, for example `host.docker.internal`, only when a client reaches the server under that name. |
 
 ## Tools
 
@@ -543,9 +543,10 @@ and `latest`. It then creates a GitHub Release listing the commits since the pre
 
 - **Meant for localhost.** There is no authentication; keep the port bound to the loopback
   interface. A web page open in your browser could still reach a server on localhost, directly or
-  through DNS rebinding, so every request addressed to a host name outside `allowed-hosts` or
-  sent from a foreign web page (its `Origin` header) is refused. The one exception is Entra
-  posting its sign-in answer to the root.
+  through DNS rebinding, so every request addressed to another host name than the local ones and
+  `additional-allowed-hosts`, or sent from a foreign web page (its `Origin` header), is refused.
+  The one exception is Entra posting its sign-in answer to the root; when the browser withholds
+  the origin of that page, the answer must carry the state of a sign-in the server started.
 - **Character sets are covered by a dependency, not a test.** The test database runs on
   `AL32UTF8`, which the thin driver handles on its own, so no test can fail the way a database on
   a regional character set would. The `orai18n` dependency covers that case; without it such a

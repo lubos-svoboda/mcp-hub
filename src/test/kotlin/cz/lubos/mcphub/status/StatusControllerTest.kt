@@ -17,6 +17,7 @@ import cz.lubos.mcphub.support.MutableClock
 import cz.lubos.mcphub.target.ConnectionProbe
 import cz.lubos.mcphub.target.ProbeTarget
 import cz.lubos.mcphub.target.TargetRegistry
+import cz.lubos.mcphub.support.awaitIdle
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
@@ -115,9 +116,7 @@ class StatusControllerTest {
         probe.probeAllInBackground()
         val whileChecking = page.statusAsPage()
         release.countDown()
-        while (probe.isProbing) {
-            Thread.sleep(10)
-        }
+        probe.awaitIdle()
         val afterwards = page.statusAsPage()
 
         assertThat(whileChecking).contains("Checking environments").contains("""content="2"""")

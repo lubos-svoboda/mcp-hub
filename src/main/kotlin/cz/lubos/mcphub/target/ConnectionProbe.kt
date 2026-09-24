@@ -105,18 +105,19 @@ class ConnectionProbe(
         }
     }
 
+    /** Atomic per target, because a requested round may probe a target while the scheduled one does too. */
     private fun record(environmentName: String, connectionState: ConnectionState, lastError: String?) {
-        val previousStatus = statusByEnvironment[environmentName]
-        if (previousStatus != null && previousStatus.connectionState == connectionState) {
-            // Same state as before: refresh the error text, keep `since`, and stay quiet in the
-            // log. Without this a disconnected network would fill the log with identical traces.
-            statusByEnvironment[environmentName] = previousStatus.copy(lastError = lastError)
-            return
+        var transition: EnvironmentStatus? = null
+        statusByEnvironment.compute(environmentName) { _, previousStatus ->
+            if (previousStatus != null && previousStatus.connectionState == connectionState) {
+                // Same state as before: refresh the error text, keep `since`, and stay quiet in the
+                // log. Without this a disconnected network would fill the log with identical traces.
+                previousStatus.copy(lastError = lastError)
+            } else {
+                EnvironmentStatus(connectionState, Instant.now(), lastError).also { transition = it }
+            }
         }
-
-        val status = EnvironmentStatus(connectionState, Instant.now(), lastError)
-        statusByEnvironment[environmentName] = status
-        logTransition(environmentName, status)
+        transition?.let { status -> logTransition(environmentName, status) }
     }
 
     private fun logTransition(environmentName: String, status: EnvironmentStatus) {

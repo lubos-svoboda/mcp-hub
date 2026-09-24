@@ -49,6 +49,9 @@ class EntraSignIn(
         return pending.accountName
     }
 
+    /** Whether the state belongs to a sign-in started here and still waiting for its answer. */
+    fun isPending(state: String): Boolean = pendingByState[state]?.let { !isExpired(it) } ?: false
+
     private fun takePending(state: String): PendingSignIn {
         val pending = pendingByState.remove(state)
         require(pending != null && !isExpired(pending)) {

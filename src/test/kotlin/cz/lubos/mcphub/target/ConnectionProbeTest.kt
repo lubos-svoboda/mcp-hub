@@ -7,6 +7,7 @@ import cz.lubos.mcphub.config.HubProperties
 import cz.lubos.mcphub.config.PoolDefaults
 import cz.lubos.mcphub.config.ProbeProperties
 import cz.lubos.mcphub.database.EnvironmentRegistry
+import cz.lubos.mcphub.support.awaitIdle
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -101,9 +102,7 @@ class ConnectionProbeTest {
         val probe = ConnectionProbe(listOf(registry), hubProperties)
 
         probe.probeInBackground("FIRST_DB")
-        while (probe.isProbing) {
-            Thread.sleep(10)
-        }
+        probe.awaitIdle()
 
         assertThat(probe.statusOf("FIRST_DB")?.connectionState).isEqualTo(ConnectionState.UP)
         assertThat(probe.statusOf("SECOND_DB")?.connectionState).isEqualTo(ConnectionState.CONNECTING)

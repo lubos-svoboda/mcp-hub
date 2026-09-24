@@ -1,6 +1,7 @@
 package cz.lubos.mcphub.web
 
 import cz.lubos.mcphub.config.HubProperties
+import cz.lubos.mcphub.entra.EntraSignIn
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -20,10 +21,13 @@ import java.net.URI
  * are checked, as the MCP specification asks of a server on localhost.
  */
 @Component
-class LocalOriginFilter(hubProperties: HubProperties) : OncePerRequestFilter() {
+class LocalOriginFilter(
+    hubProperties: HubProperties,
+    private val entraSignIn: EntraSignIn,
+) : OncePerRequestFilter() {
 
     private val logger = LoggerFactory.getLogger(this.javaClass)
-    private val allowedHosts: Set<String> = hubProperties.allowedHosts.map(String::lowercase).toSet()
+    private val allowedHosts: Set<String> = LOCAL_HOSTS + hubProperties.additionalAllowedHosts.map(String::lowercase)
 
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, chain: FilterChain) {
         val refusal = refusal(request)
@@ -49,9 +53,21 @@ class LocalOriginFilter(hubProperties: HubProperties) : OncePerRequestFilter() {
         return if (isEntraAnswer(request, origin)) null else "the request came from $origin"
     }
 
-    /** Entra posts the sign-in answer to the root from its own sign-in page; nothing else may come from there. */
-    private fun isEntraAnswer(request: HttpServletRequest, origin: String) =
-        origin == ENTRA_ORIGIN && request.method == HttpMethod.POST.name() && request.requestURI == "/"
+    /**
+     * Entra posts the sign-in answer to the root from its own sign-in page; nothing else may come from
+     * there. A browser withholding the page's origin sends `null` instead, which is accepted only
+     * together with the state of a sign-in this server started, since no other page can know it.
+     */
+    private fun isEntraAnswer(request: HttpServletRequest, origin: String): Boolean {
+        if (request.method != HttpMethod.POST.name() || request.requestURI != "/") {
+            return false
+        }
+        return when (origin) {
+            ENTRA_ORIGIN -> true
+            WITHHELD_ORIGIN -> request.getParameter("state")?.let(entraSignIn::isPending) == true
+            else -> false
+        }
+    }
 
     private fun hostName(authority: String?): String? {
         if (authority.isNullOrBlank()) {
@@ -62,5 +78,7 @@ class LocalOriginFilter(hubProperties: HubProperties) : OncePerRequestFilter() {
 
     private companion object {
         const val ENTRA_ORIGIN = "https://login.microsoftonline.com"
+        const val WITHHELD_ORIGIN = "null"
+        val LOCAL_HOSTS = setOf("localhost", "127.0.0.1", "::1")
     }
 }

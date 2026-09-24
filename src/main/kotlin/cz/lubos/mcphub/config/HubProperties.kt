@@ -10,8 +10,8 @@ data class HubProperties(
     val entraAccounts: Map<String, EntraAccountProperties> = emptyMap(),
     /** Where a browser reaches the status page; messages asking for an Entra sign-in point there. */
     val statusPageUrl: String = "http://localhost:8282/status",
-    /** Host names the server answers to. Anything else is refused, so a web page cannot reach it by DNS rebinding. */
-    val allowedHosts: List<String> = listOf("localhost", "127.0.0.1", "::1"),
+    /** Host names the server answers to besides localhost, 127.0.0.1 and ::1, which it always answers to. */
+    val additionalAllowedHosts: List<String> = emptyList(),
 ) {
     fun resolveSettings(): Map<String, EnvironmentSettings> =
         environments.mapValues { (name, environment) -> resolveEnvironment(name, environment) }
