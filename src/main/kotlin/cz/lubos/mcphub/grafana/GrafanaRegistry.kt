@@ -1,5 +1,6 @@
 package cz.lubos.mcphub.grafana
 
+import cz.lubos.mcphub.config.AuthenticationMethod
 import cz.lubos.mcphub.config.EnvironmentProperties
 import cz.lubos.mcphub.config.EnvironmentSettings
 import cz.lubos.mcphub.config.EnvironmentType
@@ -38,6 +39,10 @@ class GrafanaRegistry(hubProperties: HubProperties) : TargetRegistry {
         return hubProperties.environments
             .filterValues { properties -> properties.type == EnvironmentType.GRAFANA }
             .mapValues { (environmentName, properties) ->
+                require(properties.authentication == AuthenticationMethod.PASSWORD && properties.entraAccount == null) {
+                    "Environment $environmentName is a Grafana instance, which signs in with its token only, " +
+                        "not with Microsoft Entra ID."
+                }
                 val settings = settingsByName.getValue(environmentName)
                 GrafanaInstance(
                     settings = settings,

@@ -7,6 +7,7 @@ data class HubProperties(
     val probe: ProbeProperties = ProbeProperties(),
     val defaults: EnvironmentDefaults = EnvironmentDefaults(),
     val environments: Map<String, EnvironmentProperties> = emptyMap(),
+    val entraAccounts: Map<String, EntraAccountProperties> = emptyMap(),
 ) {
     fun resolveSettings(): Map<String, EnvironmentSettings> =
         environments.mapValues { (name, environment) -> resolveEnvironment(name, environment) }
@@ -26,6 +27,7 @@ data class HubProperties(
             connectTimeoutSeconds = environment.connectTimeoutSeconds ?: defaults.connectTimeoutSeconds,
             socketReadTimeoutSeconds = environment.socketReadTimeoutSeconds ?: defaults.socketReadTimeoutSeconds,
             pool = resolvePool(environment.pool),
+            entraAccount = environment.entraAccount,
         )
 
     private fun resolvePool(pool: PoolProperties) =
@@ -69,6 +71,30 @@ enum class EnvironmentType {
     val isDatabase: Boolean get() = this != GRAFANA
 }
 
+enum class AuthenticationMethod {
+    PASSWORD,
+
+    /** A Microsoft Entra ID access token instead of a password, obtained by signing in on the status page. */
+    ENTRA,
+}
+
+/**
+ * One identity signed in to Microsoft Entra ID. Every environment naming it shares the sign-in,
+ * so several databases reached as the same person need only one.
+ */
+data class EntraAccountProperties(
+    /** The directory the account belongs to; a sign-in into any other is refused. */
+    val tenantId: String,
+    /** The application signing in. The default is the public client of the Azure CLI, known to every tenant. */
+    val clientId: String = AZURE_CLI_CLIENT_ID,
+    /** When set, a sign-in by anybody else is refused, so one account cannot stand in for another. */
+    val expectedUser: String? = null,
+) {
+    companion object {
+        const val AZURE_CLI_CLIENT_ID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"
+    }
+}
+
 /**
  * One configured environment of any kind. A null value among the overridable settings means
  * "not overridden" and is filled in from [EnvironmentDefaults]; it never means "unknown".
@@ -100,6 +126,9 @@ data class EnvironmentProperties(
     val connectTimeoutSeconds: Int? = null,
     val socketReadTimeoutSeconds: Int? = null,
     val pool: PoolProperties = PoolProperties(),
+    val authentication: AuthenticationMethod = AuthenticationMethod.PASSWORD,
+    /** The entry under `mcp-hub.entra-accounts` to sign in with; required with [AuthenticationMethod.ENTRA] only. */
+    val entraAccount: String? = null,
 ) {
     fun requireUsername(environmentName: String): String = checkNotNull(username) {
         "Environment $environmentName is a $type database and needs a username."
@@ -113,7 +142,8 @@ data class EnvironmentProperties(
         "Environment $environmentName is a Grafana instance and needs a token."
     }
 
-    override fun toString() = "EnvironmentProperties(description=$description, type=$type, readOnly=$readOnly)"
+    override fun toString() =
+        "EnvironmentProperties(description=$description, type=$type, readOnly=$readOnly, authentication=$authentication)"
 }
 
 data class PoolProperties(
@@ -141,6 +171,7 @@ data class EnvironmentSettings(
     val connectTimeoutSeconds: Int,
     val socketReadTimeoutSeconds: Int,
     val pool: PoolSettings,
+    val entraAccount: String?,
 )
 
 data class PoolSettings(

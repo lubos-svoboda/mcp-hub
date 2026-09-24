@@ -2,6 +2,7 @@ package cz.lubos.mcphub.database
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
+import cz.lubos.mcphub.config.AuthenticationMethod
 import cz.lubos.mcphub.config.EnvironmentType
 import cz.lubos.mcphub.config.EnvironmentProperties
 import cz.lubos.mcphub.config.EnvironmentSettings
@@ -46,9 +47,42 @@ class EnvironmentRegistry(hubProperties: HubProperties) : TargetRegistry, AutoCl
                     "Environment $environmentName sets ca-file, which only a Grafana instance uses. " +
                         "Configure TLS for a database in its JDBC URL instead."
                 }
+                validateAuthentication(environmentName, properties, hubProperties)
                 val settings = settingsByName.getValue(environmentName)
                 DatabaseEnvironment(settings, createDataSource(environmentName, properties, settings))
             }
+    }
+
+    private fun validateAuthentication(
+        environmentName: String,
+        properties: EnvironmentProperties,
+        hubProperties: HubProperties,
+    ) {
+        when (properties.authentication) {
+            AuthenticationMethod.PASSWORD -> require(properties.entraAccount == null) {
+                "Environment $environmentName names entra-account ${properties.entraAccount} but signs in with " +
+                    "a password. Set authentication: ENTRA to sign in with that account."
+            }
+
+            AuthenticationMethod.ENTRA -> {
+                require(properties.type == EnvironmentType.POSTGRESQL) {
+                    "Environment $environmentName is an ${properties.type} database, which cannot sign in with " +
+                        "Microsoft Entra ID. Only POSTGRESQL environments can."
+                }
+                val definedAccounts = hubProperties.entraAccounts.keys.sorted().joinToString().ifEmpty { "none" }
+                val accountName = requireNotNull(properties.entraAccount) {
+                    "Environment $environmentName signs in with Microsoft Entra ID and needs entra-account. " +
+                        "Accounts defined under mcp-hub.entra-accounts: $definedAccounts."
+                }
+                require(accountName in hubProperties.entraAccounts) {
+                    "Environment $environmentName names entra-account $accountName, which is not defined under " +
+                        "mcp-hub.entra-accounts. Defined accounts: $definedAccounts."
+                }
+                require(properties.password == null) {
+                    "Environment $environmentName signs in with Microsoft Entra ID, so it takes no password."
+                }
+            }
+        }
     }
 
     private fun createDataSource(

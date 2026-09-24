@@ -64,6 +64,33 @@ class HubPropertiesTest {
         }
     }
 
+    @Test
+    fun `an Entra account and an environment signing in with it bind from their configuration keys`() {
+        contextRunner
+            .withPropertyValues(
+                "mcp-hub.entra-accounts.WORK.tenant-id=00000000-0000-0000-0000-000000000000",
+                "mcp-hub.entra-accounts.WORK.expected-user=you@example.com",
+                "mcp-hub.environments.AZURE_TEST_DB.description=Azure environment",
+                "mcp-hub.environments.AZURE_TEST_DB.type=POSTGRESQL",
+                "mcp-hub.environments.AZURE_TEST_DB.url=jdbc:postgresql://example.postgres.database.azure.com/example",
+                "mcp-hub.environments.AZURE_TEST_DB.username=app_readers",
+                "mcp-hub.environments.AZURE_TEST_DB.authentication=ENTRA",
+                "mcp-hub.environments.AZURE_TEST_DB.entra-account=WORK",
+            )
+            .run { context ->
+                val properties = context.getBean(HubProperties::class.java)
+                val account = properties.entraAccounts.getValue("WORK")
+
+                assertThat(account.tenantId).isEqualTo("00000000-0000-0000-0000-000000000000")
+                assertThat(account.expectedUser).isEqualTo("you@example.com")
+                assertThat(account.clientId).isEqualTo(EntraAccountProperties.AZURE_CLI_CLIENT_ID)
+                assertThat(properties.environments.getValue("AZURE_TEST_DB").authentication)
+                    .isEqualTo(AuthenticationMethod.ENTRA)
+                assertThat(properties.resolveSettings().getValue("AZURE_TEST_DB").entraAccount).isEqualTo("WORK")
+                assertThat(properties.resolveSettings().getValue("ORACLE_TEST_DB").entraAccount).isNull()
+            }
+    }
+
     private fun org.springframework.context.ApplicationContext.resolvedSettings() =
         getBean(HubProperties::class.java).resolveSettings()
 
