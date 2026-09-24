@@ -157,6 +157,9 @@ POSTGRES_CATALOG_DB:
 - `username` and `password` are required.
 - `schema` is optional and limits the schema tools to one schema. Without it they cover every
   schema except the system catalogs.
+- `schema` does not change where a query looks for tables. When they live outside the database's
+  `search_path`, add it to the URL, for example `?currentSchema=catalog,public`, so that queries
+  can name tables without the schema.
 - For TLS, add the driver's parameters to the URL, for example
   `?sslmode=verify-full&sslrootcert=/config/certs/ca.pem`.
 
@@ -534,7 +537,7 @@ git push origin v0.2.0
 
 The [release workflow](.github/workflows/release.yml) then runs every test and publishes the
 image for `linux/amd64` and `linux/arm64` to `ghcr.io/lubos-svoboda/mcp-hub` as `0.2.0`, `0.2`
-and `latest`.
+and `latest`. It then creates a GitHub Release listing the commits since the previous tag.
 
 ## Limitations
 

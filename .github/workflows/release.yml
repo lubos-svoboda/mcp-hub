@@ -51,3 +51,29 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: VERSION=${{ steps.meta.outputs.version }}
+
+  # Commits go straight to main rather than through pull requests, so the notes list the commits
+  # since the previous tag instead of relying on GitHub's pull-request based notes.
+  release:
+    needs: image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          previous=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          {
+            echo "\`\`\`bash"
+            echo "docker pull ghcr.io/$GITHUB_REPOSITORY:${GITHUB_REF_NAME#v}"
+            echo "\`\`\`"
+            echo
+            echo "## Changes${previous:+ since $previous}"
+            echo
+            git log --no-merges --format='- %s' "${previous:+$previous..}$GITHUB_REF_NAME"
+          } > notes.md
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag
