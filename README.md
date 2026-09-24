@@ -390,8 +390,6 @@ that an environment recovers on its own after its database goes away and comes b
   a regional character set would. The `orai18n` dependency covers that case; without it such a
   database refuses every connection with `ORA-17056`.
 - **A running statement cannot be cancelled** from the client. It ends at the query timeout.
-- **Targets are probed one after another**, so an unreachable one delays the rest by up to its
-  connect timeout.
 
 ## License
 

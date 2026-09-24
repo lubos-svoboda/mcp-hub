@@ -9,6 +9,8 @@ import cz.lubos.mcphub.config.ProbeProperties
 import cz.lubos.mcphub.database.EnvironmentRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Nothing listens on port 1, so every attempt fails immediately and the probe can be
@@ -69,6 +71,33 @@ class ConnectionProbeTest {
 
             assertThat(probe.statusOf(ENVIRONMENT_NAME)?.lastError).doesNotContain(PASSWORD)
         }
+    }
+
+    @Test
+    fun `a slow target does not hold up the others`() {
+        val fastTargetChecked = CountDownLatch(1)
+        // Listed first: probed one after another, it would wait for a check that never comes.
+        val slowTarget = StubTarget("SLOW_DB") {
+            check(fastTargetChecked.await(5, TimeUnit.SECONDS)) { "The fast target was not probed meanwhile" }
+        }
+        val fastTarget = StubTarget("FAST_DB") { fastTargetChecked.countDown() }
+        val registry = object : TargetRegistry {
+            override fun targets(): Collection<ProbeTarget> = listOf(slowTarget, fastTarget)
+        }
+        val probe = ConnectionProbe(listOf(registry), hubProperties)
+
+        probe.probeAll()
+
+        assertThat(probe.statusOf("SLOW_DB")?.connectionState).isEqualTo(ConnectionState.UP)
+        assertThat(probe.statusOf("FAST_DB")?.connectionState).isEqualTo(ConnectionState.UP)
+    }
+
+    private class StubTarget(override val name: String, private val check: () -> Unit) : ProbeTarget {
+        override val description: String = "Stub"
+        override val type: EnvironmentType = EnvironmentType.POSTGRESQL
+        override val readOnly: Boolean = true
+
+        override fun checkReachable() = check()
     }
 
     private companion object {

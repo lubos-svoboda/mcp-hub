@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 
 /**
  * Single owner of every target's state. One repeating task covers three things at once: it
@@ -43,9 +44,13 @@ class ConnectionProbe(
 
     fun statusOf(environmentName: String): EnvironmentStatus? = statusByEnvironment[environmentName]
 
-    // Targets are probed one after another, so a timing-out target delays the others by up to
-    // its connect timeout. Acceptable while the count stays small.
-    fun probeAll() = allTargets().forEach(::probe)
+    /** Each target on a thread of its own, so an unreachable one cannot hold up the others. */
+    fun probeAll() {
+        // Closing the executor waits for every probe, so rounds never overlap.
+        Executors.newVirtualThreadPerTaskExecutor().use { executor ->
+            allTargets().forEach { target -> executor.execute { probe(target) } }
+        }
+    }
 
     private fun allTargets(): List<ProbeTarget> = registries.flatMap(TargetRegistry::targets)
 
