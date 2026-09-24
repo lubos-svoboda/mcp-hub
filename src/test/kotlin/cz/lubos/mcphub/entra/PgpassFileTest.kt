@@ -76,6 +76,28 @@ class PgpassFileTest {
         assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(file))).isEqualTo("rw-------")
     }
 
+    /** Windows editors long saved in the regional code page; such a line must come back byte for byte. */
+    @Test
+    fun `a line saved in another encoding keeps its bytes`() {
+        val regionalComment = "# Poznámka k heslům\n".toByteArray(charset("windows-1250"))
+        Files.write(file, regionalComment)
+
+        PgpassFile(file).update(managed, listOf(PgpassEntry(HOST, 5432, USER, "token-1")))
+
+        val written = Files.readAllBytes(file)
+        val ownLine = "$HOST:5432:*:$USER:token-1\n".toByteArray(Charsets.US_ASCII)
+        assertThat(written.copyOfRange(ownLine.size, written.size)).isEqualTo(regionalComment)
+    }
+
+    @Test
+    fun `a file that already holds the right lines is not rewritten`() {
+        val first = PgpassFile(file).update(managed, listOf(PgpassEntry(HOST, 5432, USER, "token-1")))
+        val second = PgpassFile(file).update(managed, listOf(PgpassEntry(HOST, 5432, USER, "token-1")))
+
+        assertThat(first).isTrue()
+        assertThat(second).isFalse()
+    }
+
     @Test
     fun `no temporary file is left behind`() {
         PgpassFile(file).update(managed, listOf(PgpassEntry(HOST, 5432, USER, "token-1")))

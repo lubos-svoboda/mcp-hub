@@ -74,6 +74,35 @@ class PgpassExportTest {
         assertThat(Files.readString(file)).contains("added-meanwhile")
     }
 
+    /** A script regenerating the file from a template drops the hub's lines; the next export restores them. */
+    @Test
+    fun `lines another program removed come back on the next export`() {
+        signIn()
+        export.export("WORK")
+        Files.writeString(file, "localhost:5432:*:postgres:secret\n")
+
+        export.exportAll()
+
+        assertThat(Files.readAllLines(file)).containsExactly(
+            "reporting.example.com:5432:*:app_readers:first-access-token",
+            "billing.example.com:6432:*:app_readers:first-access-token",
+            "localhost:5432:*:postgres:secret",
+        )
+    }
+
+    @Test
+    fun `a URL naming several hosts is refused at startup with the reason`() {
+        val properties = hubProperties.copy(
+            environments = mapOf(
+                "AZURE_REPLICATED_DB" to entraEnvironment("jdbc:postgresql://primary.example.com,replica.example.com/db"),
+            ),
+        )
+
+        val failure = assertThrows<IllegalArgumentException> { PgpassExport(properties, accounts) }
+
+        assertThat(failure.message).contains("AZURE_REPLICATED_DB").contains("one host")
+    }
+
     @Test
     fun `signing out removes the lines`() {
         signIn()
