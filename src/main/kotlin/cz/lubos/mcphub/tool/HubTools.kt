@@ -38,6 +38,9 @@ class HubTools(
             "and when to use it, which is the best guide to choosing between environments; the state (UP, " +
             "CONNECTING or DOWN) and since when it holds; the last error while DOWN; whether the " +
             "environment is read-only; and, for a database, how many pooled connections are in use. " +
+            "An environment signing in with Microsoft Entra ID also carries entra: the account, whether it " +
+            "is signed in, as whom and until when its token holds. A missing or expired sign-in can only be " +
+            "completed by the user in a browser on the server's status page, never by a tool. " +
             "Start here when unsure which environments exist or why one fails.",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,

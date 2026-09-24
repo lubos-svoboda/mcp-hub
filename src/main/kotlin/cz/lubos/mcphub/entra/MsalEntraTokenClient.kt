@@ -37,7 +37,8 @@ class MsalEntraTokenClient(accountProperties: EntraAccountProperties) : EntraTok
                 .state(state)
                 .codeChallenge(codeChallenge)
                 .codeChallengeMethod("S256")
-                .responseMode(ResponseMode.QUERY)
+                // MSAL answers with form_post whatever is asked for, so the code never appears in an address.
+                .responseMode(ResponseMode.FORM_POST)
                 .prompt(Prompt.SELECT_ACCOUNT)
                 .apply { loginHint?.let(::loginHint) }
                 .build(),

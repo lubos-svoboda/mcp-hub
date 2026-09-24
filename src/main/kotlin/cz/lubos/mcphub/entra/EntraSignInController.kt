@@ -31,10 +31,10 @@ class EntraSignInController(
         ResponseEntity.status(HttpStatus.FOUND).location(entraSignIn.start(accountName, redirectUri(request))).build()
 
     /**
-     * Entra sends the browser back to the root: the Azure CLI registration accepts http://localhost
-     * with any port but no path. Without a state the root stays the plain redirect to the status page.
+     * Entra posts the answer to the root: the Azure CLI registration accepts http://localhost with any
+     * port but no path. A plain GET of the root stays the redirect to the status page.
      */
-    @GetMapping("/", params = ["state"])
+    @PostMapping("/", params = ["state"], consumes = [MediaType.APPLICATION_FORM_URLENCODED_VALUE])
     fun signInAnswer(
         @RequestParam state: String,
         @RequestParam(required = false) code: String?,

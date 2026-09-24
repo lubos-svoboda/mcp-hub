@@ -38,6 +38,8 @@ class MsalEntraTokenClientTest {
         assertThat(parameters["code_challenge"]).isEqualTo("challenge-456")
         assertThat(parameters["code_challenge_method"]).isEqualTo("S256")
         assertThat(parameters["login_hint"]).isEqualTo("you@example.com")
+        // The answer arrives as a POST to the root, which is where the server listens for it.
+        assertThat(parameters["response_mode"]).isEqualTo("form_post")
         // offline_access is what makes Entra hand out a refresh token at all.
         assertThat(parameters["scope"]?.split(' '))
             .contains("https://ossrdbms-aad.database.windows.net/.default", "offline_access")
