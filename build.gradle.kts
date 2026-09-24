@@ -6,7 +6,22 @@ plugins {
 }
 
 group = "cz.lubos"
-version = "0.0.1"
+// A release is a git tag such as v0.1.0, and a commit after it reads like 0.1.0-3-gd2fd529.
+// A Docker build sees no .git and is given the version as -PreleaseVersion; with neither, the
+// build is not a release and says so.
+version = providers.gradleProperty("releaseVersion")
+	.orElse(gitDescribedVersion())
+	.getOrElse("0.0.0-dev")
+
+fun gitDescribedVersion(): Provider<String> =
+	if (!layout.projectDirectory.dir(".git").asFile.exists()) {
+		providers.provider { null }
+	} else {
+		providers.exec {
+			commandLine("git", "describe", "--tags", "--match", "v[0-9]*", "--dirty")
+			isIgnoreExitValue = true
+		}.standardOutput.asText.map { it.trim().removePrefix("v") }.filter(String::isNotEmpty)
+	}
 
 java {
 	toolchain {

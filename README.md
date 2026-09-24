@@ -50,8 +50,12 @@ With Docker and nothing else installed:
 ```bash
 cp -r examples ~/.mcp-hub               # then edit application.yaml and secrets.env
 echo "MCP_HUB_CONFIG=$HOME/.mcp-hub" > .env
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
+
+This runs the newest released image from `ghcr.io/lubos-svoboda/mcp-hub`. To build it from the
+checked-out source instead, run `docker compose up -d --build`.
 
 On Windows, create `.env` by hand and write the path with forward slashes, for example
 `MCP_HUB_CONFIG=C:/Users/you/.mcp-hub`.
@@ -279,11 +283,17 @@ is logged with its whole statement, and every change made in Grafana with its me
 ### Docker
 
 ```bash
-docker compose up -d --build
+docker compose pull          # a released image
+docker compose up -d
+```
+
+```bash
+docker compose up -d --build # or an image built from the source
 ```
 
 `compose.yaml` expects `MCP_HUB_CONFIG` in a `.env` file next to it; see
-[`.env.example`](.env.example). The configuration directory is mounted read-only at `/config`,
+[`.env.example`](.env.example). Without `MCP_HUB_VERSION` it runs the newest release; set it, for
+example to `0.1.0`, to stay on one release until you change it. The configuration directory is mounted read-only at `/config`,
 and `secrets.env` inside it supplies the credentials.
 
 The published port is bound to `127.0.0.1`, so nothing outside the machine can reach the server.
@@ -383,6 +393,29 @@ The integration tests cover what unit tests cannot: that a write is refused by t
 itself, that values keep their type and precision, that Czech diacritics survive both ways, that
 an environment recovers on its own after its database goes away and comes back, and that logs
 are read from Loki through Grafana's datasource proxy with a token of the Viewer role.
+
+### Versions and releases
+
+The version comes from git tags, so no file holds it:
+
+| Build | Version |
+|---|---|
+| On a tagged commit, for example `v0.1.0` | `0.1.0` |
+| Three commits after that tag | `0.1.0-3-gd2fd529`, with `-dirty` when there are uncommitted changes |
+| Without git, for example `docker compose up --build` | `0.0.0-dev` |
+
+The server reports it to every client when a session starts.
+
+To release, tag the commit and push the tag:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The [release workflow](.github/workflows/release.yml) then runs every test and publishes the
+image for `linux/amd64` and `linux/arm64` to `ghcr.io/lubos-svoboda/mcp-hub` as `0.2.0`, `0.2`
+and `latest`.
 
 ## Limitations
 

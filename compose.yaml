@@ -1,7 +1,8 @@
 services:
   mcp-hub:
+    # Published for every release; `docker compose up --build` builds the same image from source.
+    image: ghcr.io/lubos-svoboda/mcp-hub:${MCP_HUB_VERSION:-latest}
     build: .
-    image: mcp-hub
     container_name: mcp-hub
     restart: unless-stopped
     # Published on the loopback interface only: the server has no authentication.

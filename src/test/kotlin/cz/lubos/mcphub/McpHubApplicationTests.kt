@@ -17,7 +17,8 @@ class McpHubApplicationTests {
 
 	@Test
 	fun `the MCP server reports the Gradle project version`() {
-		assertThat(serverVersion).matches("\\d+\\.\\d+\\.\\d+")
+		// A release such as 0.1.0, a commit after one such as 0.1.0-3-gd2fd529, or 0.0.0-dev.
+		assertThat(serverVersion).matches("\\d+\\.\\d+\\.\\d+(-.+)?")
 	}
 
 }
