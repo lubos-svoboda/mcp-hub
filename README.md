@@ -48,6 +48,7 @@ database, spoken to over `stdio`. That has three drawbacks:
 With Docker and nothing else installed:
 
 ```bash
+git clone https://github.com/lubos-svoboda/mcp-hub.git && cd mcp-hub
 cp -r examples ~/.mcp-hub               # then edit application.yaml and secrets.env
 echo "MCP_HUB_CONFIG=$HOME/.mcp-hub" > .env
 docker compose pull
@@ -292,9 +293,18 @@ docker compose up -d --build # or an image built from the source
 ```
 
 `compose.yaml` expects `MCP_HUB_CONFIG` in a `.env` file next to it; see
-[`.env.example`](.env.example). Without `MCP_HUB_VERSION` it runs the newest release; set it, for
-example to `0.1.0`, to stay on one release until you change it. The configuration directory is mounted read-only at `/config`,
+[`.env.example`](.env.example). The configuration directory is mounted read-only at `/config`,
 and `secrets.env` inside it supplies the credentials.
+
+Without `MCP_HUB_VERSION` in `.env`, Compose runs the newest release. Moving to a newer one is a
+pull and a restart:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Set `MCP_HUB_VERSION`, for example to `0.1.0`, to stay on one release until you change it.
 
 The published port is bound to `127.0.0.1`, so nothing outside the machine can reach the server.
 `restart: unless-stopped` brings it back after a reboot, before the first client asks for it.
@@ -393,6 +403,17 @@ The integration tests cover what unit tests cannot: that a write is refused by t
 itself, that values keep their type and precision, that Czech diacritics survive both ways, that
 an environment recovers on its own after its database goes away and comes back, and that logs
 are read from Loki through Grafana's datasource proxy with a token of the Viewer role.
+
+### Continuous integration
+
+| Event | What runs |
+|---|---|
+| Push to `main` | Unit tests. |
+| Pull request to `main` | Unit tests, integration tests and a build of the Docker image. |
+| Tag `v*` | Every test, then the release described below. |
+
+The integration tests take minutes because of the Oracle container, which is why a push to
+`main` does not wait for them.
 
 ### Versions and releases
 
