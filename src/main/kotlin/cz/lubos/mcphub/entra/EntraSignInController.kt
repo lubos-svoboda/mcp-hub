@@ -44,7 +44,7 @@ class EntraSignInController(
         try {
             if (code != null) {
                 entraSignIn.complete(state, code)
-                probeInBackground()
+                connectionProbe.probeAllInBackground()
             } else {
                 entraSignIn.fail(state, listOfNotNull(error, errorDescription).joinToString(": ").ifEmpty { "no code returned" })
             }
@@ -61,18 +61,13 @@ class EntraSignInController(
     fun signOut(@PathVariable accountName: String): ResponseEntity<String> {
         entraAccountRegistry.requireAccount(accountName).signOut()
         environmentRegistry.evictConnectionsOf(accountName)
-        probeInBackground()
+        connectionProbe.probeAllInBackground()
         return backToStatusPage()
     }
 
     @ExceptionHandler(IllegalArgumentException::class)
     fun refused(refusal: IllegalArgumentException): ResponseEntity<String> =
         ResponseEntity.badRequest().contentType(MediaType.TEXT_PLAIN).body(refusal.message)
-
-    /** The environments turn up or down within seconds rather than at the next scheduled probe. */
-    private fun probeInBackground() {
-        Thread.ofVirtual().name("entra-probe").start { connectionProbe.probeAll() }
-    }
 
     private fun backToStatusPage(): ResponseEntity<String> =
         ResponseEntity.status(HttpStatus.SEE_OTHER).location(URI.create("/status")).build()

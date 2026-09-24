@@ -31,7 +31,7 @@ class EntraSignInControllerTest {
     private val connectionProbe = ConnectionProbe(listOf(environmentRegistry), hubProperties)
     private val mockMvc = MockMvcBuilders.standaloneSetup(
         EntraSignInController(EntraSignIn(accounts, clock), accounts, environmentRegistry, connectionProbe),
-        StatusController(EnvironmentStatusReporter(listOf(environmentRegistry), connectionProbe, accounts)),
+        StatusController(EnvironmentStatusReporter(listOf(environmentRegistry), connectionProbe, accounts), connectionProbe),
     ).build()
 
     @AfterEach

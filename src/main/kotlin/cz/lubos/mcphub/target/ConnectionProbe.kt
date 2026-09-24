@@ -10,6 +10,7 @@ import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Single owner of every target's state. One repeating task covers three things at once: it
@@ -24,6 +25,10 @@ class ConnectionProbe(
 
     private val logger = LoggerFactory.getLogger(this.javaClass)
     private val statusByEnvironment = ConcurrentHashMap<String, EnvironmentStatus>()
+    private val roundsRunning = AtomicInteger()
+
+    @Volatile
+    private var lastRoundFinishedAt: Instant? = null
 
     init {
         val startedAt = Instant.now()
@@ -44,11 +49,34 @@ class ConnectionProbe(
 
     fun statusOf(environmentName: String): EnvironmentStatus? = statusByEnvironment[environmentName]
 
-    /** Each target on a thread of its own, so an unreachable one cannot hold up the others. */
+    val isProbing: Boolean get() = roundsRunning.get() > 0
+
+    fun lastRoundFinishedAt(): Instant? = lastRoundFinishedAt
+
     fun probeAll() {
-        // Closing the executor waits for every probe, so rounds never overlap.
-        Executors.newVirtualThreadPerTaskExecutor().use { executor ->
-            allTargets().forEach { target -> executor.execute { probe(target) } }
+        roundsRunning.incrementAndGet()
+        probeRound()
+    }
+
+    /**
+     * Starts a round at once without waiting for it, for example right after a sign-in. The round
+     * counts as running before this returns, so a page rendered next already shows it.
+     */
+    fun probeAllInBackground() {
+        roundsRunning.incrementAndGet()
+        Thread.ofVirtual().name("requested-probe").start { probeRound() }
+    }
+
+    /** Each target on a thread of its own, so an unreachable one cannot hold up the others. */
+    private fun probeRound() {
+        try {
+            // Closing the executor waits for every probe of the round.
+            Executors.newVirtualThreadPerTaskExecutor().use { executor ->
+                allTargets().forEach { target -> executor.execute { probe(target) } }
+            }
+        } finally {
+            lastRoundFinishedAt = Instant.now()
+            roundsRunning.decrementAndGet()
         }
     }
 

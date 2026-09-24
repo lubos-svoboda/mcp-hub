@@ -15,9 +15,13 @@ import cz.lubos.mcphub.support.FakeEntraTokenClient.Companion.TENANT_ID
 import cz.lubos.mcphub.support.FakeEntraTokenClient.Companion.USER
 import cz.lubos.mcphub.support.MutableClock
 import cz.lubos.mcphub.target.ConnectionProbe
+import cz.lubos.mcphub.target.ProbeTarget
+import cz.lubos.mcphub.target.TargetRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class StatusControllerTest {
 
@@ -41,7 +45,7 @@ class StatusControllerTest {
     private val environmentRegistry = EnvironmentRegistry(hubProperties, accounts)
     private val connectionProbe = ConnectionProbe(listOf(environmentRegistry), hubProperties)
     private val reporter = EnvironmentStatusReporter(listOf(environmentRegistry), connectionProbe, accounts)
-    private val controller = StatusController(reporter)
+    private val controller = StatusController(reporter, connectionProbe)
 
     @AfterEach
     fun close() = environmentRegistry.close()
@@ -71,13 +75,45 @@ class StatusControllerTest {
 
     @Test
     fun `a page without Entra accounts has no Entra section`() {
+        val plainProbe = ConnectionProbe(emptyList(), HubProperties())
         val plainReporter = EnvironmentStatusReporter(
             emptyList(),
-            ConnectionProbe(emptyList(), HubProperties()),
+            plainProbe,
             EntraAccountRegistry(HubProperties(), { tokenClient }, clock),
         )
 
-        assertThat(StatusController(plainReporter).statusAsPage()).doesNotContain("Entra accounts")
+        assertThat(StatusController(plainReporter, plainProbe).statusAsPage()).doesNotContain("Entra accounts")
+    }
+
+    /** Right after a sign-in or a click on Check now the outcome is seconds away, not a whole reload. */
+    @Test
+    fun `a running check shows a spinner and reloads the page quickly until it is done`() {
+        val release = CountDownLatch(1)
+        val slowTarget = object : ProbeTarget {
+            override val name = "SLOW_DB"
+            override val description = "Answers when released"
+            override val type = EnvironmentType.POSTGRESQL
+            override val readOnly = true
+            override fun checkReachable() {
+                release.await(10, TimeUnit.SECONDS)
+            }
+        }
+        val registry = object : TargetRegistry {
+            override fun targets(): Collection<ProbeTarget> = listOf(slowTarget)
+        }
+        val probe = ConnectionProbe(listOf(registry), HubProperties())
+        val page = StatusController(EnvironmentStatusReporter(listOf(registry), probe, accounts), probe)
+
+        probe.probeAllInBackground()
+        val whileChecking = page.statusAsPage()
+        release.countDown()
+        while (probe.isProbing) {
+            Thread.sleep(10)
+        }
+        val afterwards = page.statusAsPage()
+
+        assertThat(whileChecking).contains("Checking environments").contains("""content="2"""")
+        assertThat(afterwards).contains("""Checked at <time datetime="20""").contains("countdown").contains("""content="10"""").doesNotContain("spinner\"")
     }
 
     private companion object {
