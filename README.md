@@ -53,6 +53,9 @@ echo "MCP_HUB_CONFIG=$HOME/.mcp-hub" > .env
 docker compose up -d --build
 ```
 
+On Windows, create `.env` by hand and write the path with forward slashes, for example
+`MCP_HUB_CONFIG=C:/Users/you/.mcp-hub`.
+
 Open <http://127.0.0.1:8282/> to see the state of every environment, then
 [connect a client](#connecting-a-client).
 
