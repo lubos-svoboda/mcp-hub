@@ -14,12 +14,5 @@ services:
     # before a container can reach a database running on the host.
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    environment:
-      # Inside the container the server must listen on every interface, otherwise the
-      # published port reaches nothing. Only the host binding above limits access.
-      SERVER_ADDRESS: "0.0.0.0"
-      # A file rather than a directory: a directory that cannot be read would be skipped silently,
-      # leaving a server with no environments, while a missing file stops the start with an error.
-      SPRING_CONFIG_ADDITIONAL_LOCATION: "file:/config/application.yaml"
     volumes:
       - ${MCP_HUB_CONFIG}:/config:ro

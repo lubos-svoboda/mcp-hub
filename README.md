@@ -50,19 +50,18 @@ database, spoken to over `stdio`. That has three drawbacks:
 
 With Docker and nothing else installed:
 
-```bash
-git clone https://github.com/lubos-svoboda/mcp-hub.git && cd mcp-hub
-cp -r examples ~/.mcp-hub               # then edit application.yaml and secrets.env
-echo "MCP_HUB_CONFIG=$HOME/.mcp-hub" > .env
-docker compose pull
-docker compose up -d
-```
+1. Create a configuration directory `~/.mcp-hub/` with `application.yaml` and `secrets.env`, as
+   described under [Configuration](#configuration). [`examples/`](examples) holds both files,
+   ready to copy.
+2. Start the published image:
 
-This runs the newest released image from `ghcr.io/lubos-svoboda/mcp-hub`. To build it from the
-checked-out source instead, run `docker compose up -d --build`.
+   ```bash
+   docker run -d --name mcp-hub --restart unless-stopped -p 127.0.0.1:8282:8282 -v ~/.mcp-hub:/config:ro --env-file ~/.mcp-hub/secrets.env ghcr.io/lubos-svoboda/mcp-hub
+   ```
 
-On Windows, create `.env` by hand and write the path with forward slashes, for example
-`MCP_HUB_CONFIG=C:/Users/you/.mcp-hub`.
+- On Windows, write the full path instead of `~`, for example `C:/Users/you/.mcp-hub`.
+- On Linux, add `--add-host host.docker.internal:host-gateway` when a database runs on the
+  machine itself. Docker Desktop defines that name on its own.
 
 Open <http://127.0.0.1:8282/> to see the state of every environment, then
 [connect a client](#connecting-a-client).
@@ -286,31 +285,39 @@ is logged with its whole statement, and every change made in Grafana with its me
 
 ### Docker
 
-```bash
-docker compose pull          # a released image
-docker compose up -d
-```
+The [quick start](#quick-start) runs the published image with `docker run`. The configuration
+directory is mounted read-only at `/config`, and `secrets.env` inside it supplies the credentials.
+Moving to a newer release means pulling it and starting the container again:
 
 ```bash
-docker compose up -d --build # or an image built from the source
+docker pull ghcr.io/lubos-svoboda/mcp-hub
+docker rm -f mcp-hub
 ```
 
-`compose.yaml` expects `MCP_HUB_CONFIG` in a `.env` file next to it; see
-[`.env.example`](.env.example). The configuration directory is mounted read-only at `/config`,
-and `secrets.env` inside it supplies the credentials.
+Then run the `docker run` command from the quick start again. Name a version such as
+`ghcr.io/lubos-svoboda/mcp-hub:0.1.1` instead to stay on one release.
 
-Without `MCP_HUB_VERSION` in `.env`, Compose runs the newest release. Moving to a newer one is a
-pull and a restart:
+### Docker Compose
+
+A clone of this repository runs the same image with Docker Compose, which keeps the settings in
+[`compose.yaml`](compose.yaml) and can build the image from the source:
 
 ```bash
-docker compose pull
-docker compose up -d
+git clone https://github.com/lubos-svoboda/mcp-hub.git && cd mcp-hub
+echo "MCP_HUB_CONFIG=$HOME/.mcp-hub" > .env
+docker compose up -d           # the newest release
+docker compose up -d --build   # or an image built from the source
 ```
 
-Set `MCP_HUB_VERSION`, for example to `0.1.0`, to stay on one release until you change it.
+On Windows, create `.env` by hand and write the path with forward slashes, for example
+`MCP_HUB_CONFIG=C:/Users/you/.mcp-hub`; see [`.env.example`](.env.example). Without
+`MCP_HUB_VERSION` in `.env`, Compose runs the newest release, and `docker compose pull` followed
+by `docker compose up -d` moves to a newer one. Set `MCP_HUB_VERSION`, for example to `0.1.1`, to
+stay on one release until you change it.
 
-The published port is bound to `127.0.0.1`, so nothing outside the machine can reach the server.
-`restart: unless-stopped` brings it back after a reboot, before the first client asks for it.
+Either way, the published port is bound to `127.0.0.1`, so nothing outside the machine can reach
+the server, and the restart policy `unless-stopped` brings it back after a reboot, before the
+first client asks for it.
 
 A database running on the host itself is reached as `host.docker.internal`.
 
@@ -325,8 +332,8 @@ chmod 644 ~/.mcp-hub/application.yaml
 chmod -R a+rX ~/.mcp-hub/certs    # only if you keep certificates there
 ```
 
-`secrets.env` can stay readable by you only: Docker Compose reads it on the host and hands the
-values to the container as environment variables.
+`secrets.env` can stay readable by you only: `docker run --env-file` and Docker Compose both read
+it on the host and hand the values to the container as environment variables.
 
 ### Without Docker
 
@@ -341,7 +348,7 @@ properties file:
 The server then listens on `127.0.0.1:8282`. Certificate paths in `ca-file` are paths on your
 machine in this case, not under `/config`.
 
-A backslash in `secrets.env` means something different in each case: Docker Compose takes it
+A backslash in `secrets.env` means something different in each case: Docker takes it
 literally, while the properties format treats it as the start of an escape sequence. Without
 Docker, write a password containing a backslash with the backslash doubled.
 
