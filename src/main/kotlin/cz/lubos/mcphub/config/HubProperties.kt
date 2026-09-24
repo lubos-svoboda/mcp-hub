@@ -93,6 +93,11 @@ data class EntraAccountProperties(
     val clientId: String = AZURE_CLI_CLIENT_ID,
     /** When set, a sign-in by anybody else is refused, so one account cannot stand in for another. */
     val expectedUser: String? = null,
+    /**
+     * Optional PostgreSQL password file the account's current token is written to, so that psql, an IDE
+     * or another client reaches the same databases without a sign-in of its own. Off when left out.
+     */
+    val pgpassFile: String? = null,
 ) {
     companion object {
         const val AZURE_CLI_CLIENT_ID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"

@@ -22,6 +22,7 @@ class EntraSignInController(
     private val entraAccountRegistry: EntraAccountRegistry,
     private val environmentRegistry: EnvironmentRegistry,
     private val connectionProbe: ConnectionProbe,
+    private val pgpassExport: PgpassExport,
 ) {
 
     private val logger = LoggerFactory.getLogger(this.javaClass)
@@ -43,7 +44,8 @@ class EntraSignInController(
     ): ResponseEntity<String> =
         try {
             if (code != null) {
-                entraSignIn.complete(state, code)
+                val accountName = entraSignIn.complete(state, code)
+                pgpassExport.export(accountName)
                 connectionProbe.probeAllInBackground()
             } else {
                 entraSignIn.fail(state, listOfNotNull(error, errorDescription).joinToString(": ").ifEmpty { "no code returned" })
@@ -61,6 +63,7 @@ class EntraSignInController(
     fun signOut(@PathVariable accountName: String): ResponseEntity<String> {
         entraAccountRegistry.requireAccount(accountName).signOut()
         environmentRegistry.evictConnectionsOf(accountName)
+        pgpassExport.export(accountName)
         connectionProbe.probeAllInBackground()
         return backToStatusPage()
     }

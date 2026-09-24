@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `pgpass-file` on an Entra account writes its current token into a PostgreSQL password file, so
+  that psql, an IDE or another client reaches the same databases without a sign-in of its own.
+
 ## [0.2.0] - 2026-09-24
 
 ### Added

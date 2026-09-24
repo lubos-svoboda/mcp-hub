@@ -16,3 +16,7 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ${MCP_HUB_CONFIG}:/config:ro
+      # Optional, for an Entra account's pgpass-file: the directory holding the password file,
+      # writable. On Windows the one PostgreSQL clients read; on Linux a directory of its own, with
+      # `user: "1000:1000"` (your id -u and id -g) above so that the file belongs to you.
+      # - ${APPDATA}/postgresql:/pgpass

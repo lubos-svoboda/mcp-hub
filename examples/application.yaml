@@ -68,3 +68,5 @@ mcp-hub:
   #   WORK:
   #     tenant-id: 00000000-0000-0000-0000-000000000000
   #     expected-user: you@example.com
+  #     # Optional: also write the current token to a PostgreSQL password file for other clients.
+  #     # pgpass-file: /pgpass/pgpass.conf

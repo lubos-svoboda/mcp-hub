@@ -30,7 +30,13 @@ class EntraSignInControllerTest {
     private val environmentRegistry = EnvironmentRegistry(hubProperties, accounts)
     private val connectionProbe = ConnectionProbe(listOf(environmentRegistry), hubProperties)
     private val mockMvc = MockMvcBuilders.standaloneSetup(
-        EntraSignInController(EntraSignIn(accounts, clock), accounts, environmentRegistry, connectionProbe),
+        EntraSignInController(
+            EntraSignIn(accounts, clock),
+            accounts,
+            environmentRegistry,
+            connectionProbe,
+            PgpassExport(hubProperties, accounts),
+        ),
         StatusController(EnvironmentStatusReporter(listOf(environmentRegistry), connectionProbe, accounts), connectionProbe),
     ).build()
 

@@ -190,6 +190,7 @@ mcp-hub:
 | `tenant-id` | yes | The directory the account belongs to, as `az account show --query tenantId` prints it. A sign-in into any other tenant is refused. |
 | `expected-user` | no | When set, a sign-in by anybody else is refused, so one account cannot stand in for another. |
 | `client-id` | no | The application that signs in. See [the client ID](#the-client-id). |
+| `pgpass-file` | no | A PostgreSQL password file to write the current token to, for other clients. See [sharing the sign-in](#sharing-the-sign-in-with-other-clients). |
 
 - `username` is the database role the token is mapped to: your own user principal name, or the
   name of an Entra group that was made a principal of the database. There is no password.
@@ -222,6 +223,44 @@ token only when a connection signs in. You have to sign in again only when:
 
 **Signing out** on the status page forgets the tokens and closes the pooled connections, so that
 nothing keeps using the sign-in.
+
+#### Sharing the sign-in with other clients
+
+With `pgpass-file` set on an account, the server also writes the account's current token into a
+PostgreSQL password file, so that psql, an IDE or another tool reaches the same databases without
+signing in on its own. It is off unless set.
+
+```yaml
+mcp-hub:
+  entra-accounts:
+    WORK:
+      tenant-id: 00000000-0000-0000-0000-000000000000
+      pgpass-file: /pgpass/pgpass.conf
+```
+
+- Every server and user of the account's environments gets one line, `host:port:*:user:token`,
+  written after a sign-in and renewed ahead of time about every hour, even while nobody uses the
+  hub. Signing out removes the lines.
+- Other lines stay as they are. Lines for the same host and user are replaced, since they could
+  only hold an older token, and the server's lines go first, because clients use the first match.
+- The file is replaced in one step, so a client never reads it half written, and on Linux and
+  macOS it is readable by its owner only, as PostgreSQL clients require.
+- This puts an access token on disk: whoever can read the file can reach the databases until the
+  token expires, at most 90 minutes later. The refresh token itself never leaves memory.
+
+Where the file goes depends on how the server runs. In Docker, mount the **directory** holding
+it, not the file: the file is replaced by renaming a new one next to it.
+
+| Server runs | Clients look for | Mount and settings |
+|---|---|---|
+| Docker Desktop on Windows | `%APPDATA%\postgresql\pgpass.conf` | `-v "$env:APPDATA\postgresql:/pgpass"` (PowerShell), `pgpass-file: /pgpass/pgpass.conf` |
+| Docker on Linux or macOS | the file `PGPASSFILE` names | `-v ~/.mcp-hub-pgpass:/pgpass --user "$(id -u):$(id -g)"`, `pgpass-file: /pgpass/pgpass`, and `export PGPASSFILE=~/.mcp-hub-pgpass/pgpass` for the clients |
+| Without Docker | `%APPDATA%\postgresql\pgpass.conf` or `~/.pgpass` | the path itself, for example `pgpass-file: /home/you/.pgpass` |
+
+On Linux the container has to run as you: it otherwise runs as a system user of its own, which may
+not write into your directory, and a file it created would belong to that user, so you could not
+read it. A directory of its own keeps your home directory out of the container; `PGPASSFILE`
+points the clients at it. Create the directory before starting the container.
 
 #### The client ID
 
