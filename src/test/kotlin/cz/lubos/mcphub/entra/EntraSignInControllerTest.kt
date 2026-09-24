@@ -37,7 +37,7 @@ class EntraSignInControllerTest {
             connectionProbe,
             PgpassExport(hubProperties, accounts),
         ),
-        StatusController(EnvironmentStatusReporter(listOf(environmentRegistry), connectionProbe, accounts), connectionProbe),
+        StatusController(EnvironmentStatusReporter(listOf(environmentRegistry), connectionProbe, accounts, PgpassExport(hubProperties, accounts)), connectionProbe),
     ).build()
 
     @AfterEach

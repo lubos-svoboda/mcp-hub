@@ -7,8 +7,12 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.net.URI
 import java.nio.file.Path
+import java.time.Clock
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+
+data class PasswordFileStatus(val path: String, val lastWritten: Instant?, val lastError: String?)
 
 /**
  * Writes the current token of every Entra account with a `pgpass-file` into that file, so that other
@@ -17,13 +21,22 @@ import java.util.concurrent.TimeUnit
  * compared with what it should hold every time, so lines another program removed come back.
  */
 @Component
-class PgpassExport(hubProperties: HubProperties, private val entraAccountRegistry: EntraAccountRegistry) {
+class PgpassExport(
+    hubProperties: HubProperties,
+    private val entraAccountRegistry: EntraAccountRegistry,
+    private val clock: Clock = Clock.systemUTC(),
+) {
 
     private val logger = LoggerFactory.getLogger(this.javaClass)
     private val exportsByAccount: Map<String, AccountExport> = build(hubProperties)
 
     /** Accounts may share a file, so writes are serialised per file rather than per account. */
     private val locksByFile = ConcurrentHashMap<Path, Any>()
+    private val statusByAccount = ConcurrentHashMap<String, PasswordFileStatus>()
+
+    /** Null for an account without a password file. */
+    fun status(accountName: String): PasswordFileStatus? =
+        exportsByAccount[accountName]?.let { statusByAccount[accountName] ?: PasswordFileStatus(it.path.toString(), null, null) }
 
     @Scheduled(fixedDelay = 60, initialDelay = 60, timeUnit = TimeUnit.SECONDS)
     fun exportAll() = exportsByAccount.keys.forEach(::export)
@@ -45,7 +58,9 @@ class PgpassExport(hubProperties: HubProperties, private val entraAccountRegistr
 
         synchronized(locksByFile.computeIfAbsent(accountExport.path.toAbsolutePath().normalize()) { Any() }) {
             try {
-                if (!accountExport.file.update(accountExport.managed, entries)) {
+                val written = accountExport.file.update(accountExport.managed, entries)
+                record(accountName, accountExport, if (written) clock.instant() else null, lastError = null)
+                if (!written) {
                     return
                 }
                 if (token == null) {
@@ -54,9 +69,19 @@ class PgpassExport(hubProperties: HubProperties, private val entraAccountRegistr
                     logger.info("Wrote the token of Entra account {} for {} login(s) to {}", accountName, entries.size, accountExport.path)
                 }
             } catch (failure: Exception) {
+                record(accountName, accountExport, lastWritten = null, lastError = "Could not write ${accountExport.path}: ${failure.message}")
                 logger.warn("Entra account {} could not write {}: {}", accountName, accountExport.path, failure.message)
             }
         }
+    }
+
+    private fun record(accountName: String, accountExport: AccountExport, lastWritten: Instant?, lastError: String?) {
+        val previous = statusByAccount[accountName]
+        statusByAccount[accountName] = PasswordFileStatus(
+            path = accountExport.path.toString(),
+            lastWritten = lastWritten ?: previous?.lastWritten,
+            lastError = lastError,
+        )
     }
 
     private fun build(hubProperties: HubProperties): Map<String, AccountExport> =

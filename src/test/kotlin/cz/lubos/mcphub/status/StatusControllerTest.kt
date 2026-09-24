@@ -10,6 +10,7 @@ import cz.lubos.mcphub.config.PoolDefaults
 import cz.lubos.mcphub.database.EnvironmentRegistry
 import cz.lubos.mcphub.entra.EntraAccountRegistry
 import cz.lubos.mcphub.entra.EntraAccountState
+import cz.lubos.mcphub.entra.PgpassExport
 import cz.lubos.mcphub.support.FakeEntraTokenClient
 import cz.lubos.mcphub.support.FakeEntraTokenClient.Companion.TENANT_ID
 import cz.lubos.mcphub.support.FakeEntraTokenClient.Companion.USER
@@ -45,7 +46,7 @@ class StatusControllerTest {
     private val accounts = EntraAccountRegistry(hubProperties, { tokenClient }, clock)
     private val environmentRegistry = EnvironmentRegistry(hubProperties, accounts)
     private val connectionProbe = ConnectionProbe(listOf(environmentRegistry), hubProperties)
-    private val reporter = EnvironmentStatusReporter(listOf(environmentRegistry), connectionProbe, accounts)
+    private val reporter = EnvironmentStatusReporter(listOf(environmentRegistry), connectionProbe, accounts, PgpassExport(hubProperties, accounts))
     private val controller = StatusController(reporter, connectionProbe)
 
     @AfterEach
@@ -85,10 +86,12 @@ class StatusControllerTest {
     @Test
     fun `a page without Entra accounts has no Entra section`() {
         val plainProbe = ConnectionProbe(emptyList(), HubProperties())
+        val plainAccounts = EntraAccountRegistry(HubProperties(), { tokenClient }, clock)
         val plainReporter = EnvironmentStatusReporter(
             emptyList(),
             plainProbe,
-            EntraAccountRegistry(HubProperties(), { tokenClient }, clock),
+            plainAccounts,
+            PgpassExport(HubProperties(), plainAccounts),
         )
 
         assertThat(StatusController(plainReporter, plainProbe).statusAsPage()).doesNotContain("Entra accounts")
@@ -111,7 +114,7 @@ class StatusControllerTest {
             override fun targets(): Collection<ProbeTarget> = listOf(slowTarget)
         }
         val probe = ConnectionProbe(listOf(registry), HubProperties())
-        val page = StatusController(EnvironmentStatusReporter(listOf(registry), probe, accounts), probe)
+        val page = StatusController(EnvironmentStatusReporter(listOf(registry), probe, accounts, PgpassExport(hubProperties, accounts)), probe)
 
         probe.probeAllInBackground()
         val whileChecking = page.statusAsPage()

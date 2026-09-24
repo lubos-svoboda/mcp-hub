@@ -6,6 +6,7 @@ import cz.lubos.mcphub.database.PoolUsage
 import cz.lubos.mcphub.entra.EntraAccount
 import cz.lubos.mcphub.entra.EntraAccountRegistry
 import cz.lubos.mcphub.entra.EntraAccountState
+import cz.lubos.mcphub.entra.PgpassExport
 import cz.lubos.mcphub.target.ConnectionProbe
 import cz.lubos.mcphub.target.ConnectionState
 import cz.lubos.mcphub.target.ProbeTarget
@@ -33,6 +34,14 @@ data class EntraAccountView(
     val accessTokenValidUntil: String?,
     val lastRefresh: String?,
     val lastError: String?,
+    /** Present when the account writes its token to a PostgreSQL password file. */
+    val passwordFile: PasswordFileView?,
+)
+
+data class PasswordFileView(
+    val path: String,
+    val lastWritten: String?,
+    val lastError: String?,
 )
 
 /** One description of what the hub is connected to, shared by the MCP tool and the status page. */
@@ -41,6 +50,7 @@ class EnvironmentStatusReporter(
     private val registries: List<TargetRegistry>,
     private val connectionProbe: ConnectionProbe,
     private val entraAccountRegistry: EntraAccountRegistry,
+    private val pgpassExport: PgpassExport,
 ) {
 
     fun report(): List<EnvironmentView> = registries.flatMap(TargetRegistry::targets).map(::describe)
@@ -78,6 +88,9 @@ class EnvironmentStatusReporter(
             accessTokenValidUntil = status.accessTokenValidUntil?.toString(),
             lastRefresh = status.lastRefresh?.toString(),
             lastError = status.lastError,
+            passwordFile = pgpassExport.status(account.name)?.let { file ->
+                PasswordFileView(file.path, file.lastWritten?.toString(), file.lastError)
+            },
         )
     }
 }

@@ -79,6 +79,7 @@ class StatusController(
               <td>${time(account.accessTokenValidUntil)}</td>
               <td>${time(account.lastRefresh)}</td>
               <td class="note">${escape(account.lastError ?: "")}</td>
+              <td>${passwordFile(account.passwordFile)}</td>
               <td>$action</td>
             </tr>
             """.trimIndent()
@@ -89,7 +90,7 @@ class StatusController(
             """
             <h2>Entra accounts</h2>
             <table>
-              <tr><th>Account</th><th>State</th><th>User</th><th>Signed in since</th><th>Token valid until</th><th>Last refresh</th><th>Last error</th><th></th></tr>
+              <tr><th>Account</th><th>State</th><th>User</th><th>Signed in since</th><th>Token valid until</th><th>Last refresh</th><th>Last error</th><th>Password file</th><th></th></tr>
               $entraRows
             </table>
             """.trimIndent()
@@ -135,6 +136,7 @@ class StatusController(
                 tr.down .state { color: #b3261e; }
                 tr.connecting .state { color: #8a6d00; }
                 .note { color: #6b6b6b; font-size: .85em; }
+                .note.error { color: #b3261e; }
                 header { display: flex; align-items: center; gap: 1rem; margin: 0 0 1rem; }
                 header h1 { margin: 0; }
                 .probe { color: #6b6b6b; display: flex; align-items: center; gap: .4rem; }
@@ -170,6 +172,7 @@ class StatusController(
                   .button, button { background: #26282c; border-color: #3a3d42; }
                   .countdown { background: conic-gradient(#bbb var(--elapsed), #3a3d42 0); }
                   .banner { background: #2f2a17; border-color: #6b5a1e; }
+                  .note.error { color: #ef7a72; }
                   .spinner { border-color: #3a3d42; border-top-color: #bbb; }
                 }
               </style>
@@ -202,6 +205,16 @@ class StatusController(
             </body>
             </html>
         """.trimIndent()
+    }
+
+    /** Where the account writes its token for other clients, when it was last written and why it could not be. */
+    private fun passwordFile(file: PasswordFileView?): String {
+        if (file == null) {
+            return "—"
+        }
+        val written = file.lastWritten?.let { "written ${time(it)}" } ?: "not written yet"
+        val error = file.lastError?.let { """<div class="note error">${escape(it)}</div>""" } ?: ""
+        return """${escape(file.path)}<div class="note">$written</div>$error"""
     }
 
     /** Readable without script as ISO-8601; the script on the page rewrites it in the reader's own format. */

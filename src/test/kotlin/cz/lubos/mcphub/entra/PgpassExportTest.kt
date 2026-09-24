@@ -35,7 +35,7 @@ class PgpassExportTest {
         )
     }
     private val accounts by lazy { EntraAccountRegistry(hubProperties, { tokenClient }, clock) }
-    private val export by lazy { PgpassExport(hubProperties, accounts) }
+    private val export by lazy { PgpassExport(hubProperties, accounts, clock) }
 
     /** Two databases on one server and user share a line, and a missing port is the default one. */
     @Test
@@ -101,6 +101,26 @@ class PgpassExportTest {
         val failure = assertThrows<IllegalArgumentException> { PgpassExport(properties, accounts) }
 
         assertThat(failure.message).contains("AZURE_REPLICATED_DB").contains("one host")
+    }
+
+    /** The status page shows this, so a client that cannot sign in can be traced to the file. */
+    @Test
+    fun `the status tells when the file was written and why it could not be`() {
+        signIn()
+        export.export("WORK")
+
+        assertThat(export.status("WORK")).isEqualTo(PasswordFileStatus(file.toString(), clock.now, null))
+
+        Files.delete(file)
+        Files.delete(directory)
+        tokenClient.nextAccessToken = "second-access-token"
+        clock.advance(Duration.ofMinutes(56))
+        export.export("WORK")
+
+        val failed = requireNotNull(export.status("WORK"))
+        assertThat(failed.lastError).startsWith("Could not write $file")
+        assertThat(failed.lastWritten).isEqualTo(clock.now.minus(Duration.ofMinutes(56)))
+        assertThat(export.status("NO_SUCH_ACCOUNT")).isNull()
     }
 
     @Test
