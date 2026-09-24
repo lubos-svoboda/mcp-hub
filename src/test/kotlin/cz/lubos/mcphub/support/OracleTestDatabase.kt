@@ -26,6 +26,7 @@ object OracleTestDatabase {
 
     const val SAMPLE_TABLE = "SAMPLE_VALUES"
     const val SAMPLE_FUNCTION = "SAMPLE_DOUBLE"
+    const val SAMPLE_VIEW = "SAMPLE_VALUES_VIEW"
     const val CZECH_LABEL = "Přípojný bod Ostrava-Poruba, šířka 12 µm"
 
     private val longNote = "Poznámka s diakritikou. ".repeat(300)
@@ -96,6 +97,7 @@ object OracleTestDatabase {
                     """.trimIndent(),
                 )
                 statement.execute("create index sample_values_label_ix on $SAMPLE_TABLE (label)")
+                statement.execute("create view $SAMPLE_VIEW as select id, label from $SAMPLE_TABLE where label is not null")
                 statement.execute(
                     """
                     create or replace function $SAMPLE_FUNCTION(value_in number) return number is

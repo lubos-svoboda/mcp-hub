@@ -7,6 +7,7 @@ import cz.lubos.mcphub.support.OracleTestDatabase
 import cz.lubos.mcphub.support.OracleTestDatabase.ENVIRONMENT_NAME
 import cz.lubos.mcphub.support.OracleTestDatabase.SAMPLE_FUNCTION
 import cz.lubos.mcphub.support.OracleTestDatabase.SAMPLE_TABLE
+import cz.lubos.mcphub.support.OracleTestDatabase.SAMPLE_VIEW
 import cz.lubos.mcphub.support.OracleTestDatabase.SCHEMA
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Tag
@@ -53,6 +54,17 @@ class CatalogReaderIT {
         assertThat(matches).anyMatch { it.kind == SchemaObjectKind.TABLE && it.name == SAMPLE_TABLE }
         assertThat(matches).anyMatch { it.kind == SchemaObjectKind.PROGRAM && it.name == SAMPLE_FUNCTION }
         assertThat(matches.map { it.owner }).containsOnly(SCHEMA)
+    }
+
+    @Test
+    fun `a view is found as a view and never as a table`() {
+        val matches = withEnvironment { environment ->
+            catalogReader.search(environment, "SAMPLE", SchemaObjectKind.entries.toSet(), 100)
+        }
+
+        val view = matches.single { it.name == SAMPLE_VIEW }
+        assertThat(view.kind).isEqualTo(SchemaObjectKind.VIEW)
+        assertThat(view.detail).isEqualTo("VIEW")
     }
 
     /** A column is matched on its own name, not on the name of the table holding it. */
@@ -113,6 +125,18 @@ class CatalogReaderIT {
         assertThat(remainder.totalLines).isEqualTo(firstTwoLines.totalLines)
         assertThat(remainder.hasMore).isFalse()
         assertThat(remainder.source).contains("return value_in * 2")
+    }
+
+    @Test
+    fun `the source of a view is its defining query`() {
+        val view = withEnvironment { environment ->
+            catalogReader.readSource(environment, SAMPLE_VIEW, null, fromLine = 1, maxLines = 1_000).single()
+        }
+
+        assertThat(view.owner).isEqualTo(SCHEMA)
+        assertThat(view.type).isEqualTo("VIEW")
+        assertThat(view.hasMore).isFalse()
+        assertThat(view.source).containsIgnoringCase("where label is not null")
     }
 
     @Test

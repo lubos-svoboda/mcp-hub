@@ -49,7 +49,7 @@ class PostgresCatalog : DialectCatalog {
                         """
                         select n.nspname as schema_name, c.relname as table_name
                         from pg_class c join pg_namespace n on n.oid = c.relnamespace
-                        where c.relkind in ('r', 'p', 'v', 'm') and lower(c.relname) like ?
+                        where c.relkind in ('r', 'p') and lower(c.relname) like ?
                         """.trimIndent() + schemaClause(environment, "n.nspname") +
                             " order by c.relname limit $limitPerKind",
                         listOf(pattern) + schemaParameters(environment),
@@ -59,6 +59,28 @@ class PostgresCatalog : DialectCatalog {
                             row.getString("schema_name"),
                             row.getString("table_name"),
                             "TABLE",
+                        )
+                    },
+                )
+            }
+            if (SchemaObjectKind.VIEW in kinds) {
+                addAll(
+                    collectRows(
+                        connection,
+                        environment,
+                        """
+                        select n.nspname as schema_name, c.relname as view_name, c.relkind
+                        from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                        where c.relkind in ('v', 'm') and lower(c.relname) like ?
+                        """.trimIndent() + schemaClause(environment, "n.nspname") +
+                            " order by c.relname limit $limitPerKind",
+                        listOf(pattern) + schemaParameters(environment),
+                    ) { row ->
+                        SchemaMatch(
+                            kind = SchemaObjectKind.VIEW,
+                            owner = row.getString("schema_name"),
+                            name = row.getString("view_name"),
+                            detail = viewKind(row.getString("relkind")),
                         )
                     },
                 )
@@ -143,6 +165,24 @@ class PostgresCatalog : DialectCatalog {
                 schema = row.getString("schema_name"),
                 name = row.getString("routine_name"),
                 kind = routineKind(row.getString("prokind")),
+                body = row.getString("definition"),
+            )
+        } + collectRows(
+            connection,
+            environment,
+            """
+            select n.nspname as schema_name, c.relname as view_name, c.relkind,
+                   pg_get_viewdef(c.oid, true) as definition
+            from pg_class c join pg_namespace n on n.oid = c.relnamespace
+            where c.relkind in ('v', 'm') and lower(c.relname) = ?
+            """.trimIndent() + schemaClause(environment, "n.nspname") +
+                " order by n.nspname, c.relname",
+            listOf(objectName.lowercase()) + schemaParameters(environment),
+        ) { row ->
+            Definition(
+                schema = row.getString("schema_name"),
+                name = row.getString("view_name"),
+                kind = viewKind(row.getString("relkind")),
                 body = row.getString("definition"),
             )
         }
@@ -291,6 +331,8 @@ class PostgresCatalog : DialectCatalog {
     }
 
     private fun routineKind(code: String?) = if (code == "p") "PROCEDURE" else "FUNCTION"
+
+    private fun viewKind(code: String?) = if (code == "m") "MATERIALIZED VIEW" else "VIEW"
 
     /**
      * Without a configured schema the system catalogs would answer every search, so they are

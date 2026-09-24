@@ -20,6 +20,8 @@ object PostgresTestDatabase {
 
     const val SAMPLE_TABLE = "sample_values"
     const val SAMPLE_FUNCTION = "sample_double"
+    const val SAMPLE_VIEW = "sample_values_view"
+    const val SAMPLE_MATERIALIZED_VIEW = "sample_values_totals"
     const val CZECH_LABEL = "Přípojný bod Ostrava-Poruba, šířka 12 µm"
 
     private val container =
@@ -71,6 +73,10 @@ object PostgresTestDatabase {
                     """.trimIndent(),
                 )
                 statement.execute("create index sample_values_label_ix on $SAMPLE_TABLE (label)")
+                statement.execute("create view $SAMPLE_VIEW as select id, label from $SAMPLE_TABLE where label is not null")
+                statement.execute(
+                    "create materialized view $SAMPLE_MATERIALIZED_VIEW as select count(*) as value_count from $SAMPLE_TABLE",
+                )
                 statement.execute(
                     """
                     create function $SAMPLE_FUNCTION(value_in numeric) returns numeric as ${'$'}${'$'}

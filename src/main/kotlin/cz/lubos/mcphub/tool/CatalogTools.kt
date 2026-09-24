@@ -46,11 +46,12 @@ class CatalogTools(
 
     @McpTool(
         name = "search_schema",
-        description = "Finds tables, columns and stored programs whose name contains the given text, " +
-            "regardless of case. Stored programs are Oracle packages, procedures, functions, " +
-            "triggers and types, or PostgreSQL functions and procedures. Each hit carries its kind, " +
-            "its owner (the schema), its name — TABLE.COLUMN for a column — and a detail: the data " +
-            "type of a column, or what kind of program it is. At most $MATCHES_PER_KIND hits per " +
+        description = "Finds tables, views, columns and stored programs whose name contains the given " +
+            "text, regardless of case. Views include materialized views. Stored programs are Oracle " +
+            "packages, procedures, functions, triggers and types, or PostgreSQL functions and " +
+            "procedures. Each hit carries its kind, its owner (the schema), its name — TABLE.COLUMN " +
+            "for a column of a table or a view — and a detail: VIEW or MATERIALIZED VIEW for a view, " +
+            "the data type of a column, or what kind of program it is. At most $MATCHES_PER_KIND hits per " +
             "kind come back, the first ones in alphabetical order. Use it when the exact name is " +
             "unknown, then call describe_table or get_object_source for the hit that matters.",
         annotations = McpTool.McpAnnotations(
@@ -67,7 +68,7 @@ class CatalogTools(
         term: String,
         @McpToolParam(
             required = false,
-            description = "What to look for: any of TABLE, COLUMN and PROGRAM. All three when left out.",
+            description = "What to look for: any of TABLE, VIEW, COLUMN and PROGRAM. All four when left out.",
         )
         kinds: List<String>?,
     ): List<SchemaMatch> {
@@ -82,9 +83,10 @@ class CatalogTools(
 
     @McpTool(
         name = "get_object_source",
-        description = "Returns the source code of a stored program as one text rather than one row " +
-            "per line. On Oracle that is a package, package body, procedure, function, trigger or " +
-            "type; on PostgreSQL a function or procedure, printed as its full CREATE statement. " +
+        description = "Returns the source code of a stored program or a view as one text rather than " +
+            "one row per line. On Oracle a program is a package, package body, procedure, function, " +
+            "trigger or type; on PostgreSQL a function or procedure, printed as its full CREATE " +
+            "statement. A view or materialized view comes back as its defining query. " +
             "Every matching object is a separate entry, including each overload of a PostgreSQL " +
             "function. " +
             "A long object comes back one range of lines at a time. Each entry carries totalLines " +
@@ -108,7 +110,7 @@ class CatalogTools(
             required = false,
             description = "Restricts the answer to one kind of object. On Oracle for example PACKAGE " +
                 "or PACKAGE BODY; left out, a package returns both its specification and its body. " +
-                "On PostgreSQL FUNCTION or PROCEDURE.",
+                "On PostgreSQL FUNCTION or PROCEDURE. On both VIEW or MATERIALIZED VIEW.",
         )
         objectType: String?,
         @McpToolParam(
@@ -172,7 +174,7 @@ class CatalogTools(
 
     private fun parseKind(kind: String): SchemaObjectKind =
         SchemaObjectKind.entries.firstOrNull { it.name.equals(kind, ignoreCase = true) }
-            ?: throw IllegalArgumentException("Unknown kind '$kind'. Use TABLE, COLUMN or PROGRAM.")
+            ?: throw IllegalArgumentException("Unknown kind '$kind'. Use TABLE, VIEW, COLUMN or PROGRAM.")
 
     private companion object {
         const val MATCHES_PER_KIND = 100

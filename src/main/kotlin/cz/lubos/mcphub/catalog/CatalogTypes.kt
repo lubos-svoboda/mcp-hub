@@ -30,6 +30,7 @@ data class IndexDescription(
 
 enum class SchemaObjectKind {
     TABLE,
+    VIEW,
     COLUMN,
     PROGRAM,
 }

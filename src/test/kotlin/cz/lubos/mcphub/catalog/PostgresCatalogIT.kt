@@ -9,7 +9,9 @@ import cz.lubos.mcphub.support.PostgresTestDatabase
 import cz.lubos.mcphub.support.PostgresTestDatabase.CZECH_LABEL
 import cz.lubos.mcphub.support.PostgresTestDatabase.ENVIRONMENT_NAME
 import cz.lubos.mcphub.support.PostgresTestDatabase.SAMPLE_FUNCTION
+import cz.lubos.mcphub.support.PostgresTestDatabase.SAMPLE_MATERIALIZED_VIEW
 import cz.lubos.mcphub.support.PostgresTestDatabase.SAMPLE_TABLE
+import cz.lubos.mcphub.support.PostgresTestDatabase.SAMPLE_VIEW
 import cz.lubos.mcphub.support.PostgresTestDatabase.SCHEMA
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Tag
@@ -51,6 +53,45 @@ class PostgresCatalogIT {
 
         assertThat(matches).anyMatch { it.kind == SchemaObjectKind.TABLE && it.name == SAMPLE_TABLE }
         assertThat(matches).anyMatch { it.kind == SchemaObjectKind.PROGRAM && it.name == SAMPLE_FUNCTION }
+    }
+
+    @Test
+    fun `views are found as views, telling a materialized one apart, and never as tables`() {
+        val matches = withEnvironment { environment ->
+            catalogReader.search(environment, "sample", SchemaObjectKind.entries.toSet(), 100)
+        }
+
+        val view = matches.single { it.name == SAMPLE_VIEW }
+        assertThat(view.kind).isEqualTo(SchemaObjectKind.VIEW)
+        assertThat(view.detail).isEqualTo("VIEW")
+
+        val materializedView = matches.single { it.name == SAMPLE_MATERIALIZED_VIEW }
+        assertThat(materializedView.kind).isEqualTo(SchemaObjectKind.VIEW)
+        assertThat(materializedView.detail).isEqualTo("MATERIALIZED VIEW")
+    }
+
+    @Test
+    fun `the source of a view is its defining query, and the object type selects the kind of view`() {
+        val view = withEnvironment { environment ->
+            catalogReader.readSource(environment, SAMPLE_VIEW, null, fromLine = 1, maxLines = 1_000).single()
+        }
+
+        assertThat(view.owner).isEqualTo(SCHEMA)
+        assertThat(view.type).isEqualTo("VIEW")
+        assertThat(view.source).containsIgnoringCase("label is not null")
+
+        val materializedView = withEnvironment { environment ->
+            catalogReader.readSource(
+                environment,
+                SAMPLE_MATERIALIZED_VIEW,
+                "materialized view",
+                fromLine = 1,
+                maxLines = 1_000,
+            ).single()
+        }
+
+        assertThat(materializedView.type).isEqualTo("MATERIALIZED VIEW")
+        assertThat(materializedView.source).containsIgnoringCase("count(*)")
     }
 
     /** PostgreSQL keeps a body as one text, so the line range is cut in our code, not by the query. */

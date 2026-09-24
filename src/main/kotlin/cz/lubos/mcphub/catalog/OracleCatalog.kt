@@ -44,8 +44,13 @@ class OracleCatalog : DialectCatalog {
                         connection,
                         environment,
                         firstRows(
-                            "select owner, table_name from all_tables where upper(table_name) like ?" +
-                                ownerClause(environment, "owner") + " order by table_name",
+                            // A materialized view keeps its rows in a table of the same name, which
+                            // is reported as the view it belongs to rather than as a table.
+                            "select owner, table_name from all_tables t where upper(table_name) like ?" +
+                                ownerClause(environment, "owner") +
+                                " and not exists (select 1 from all_mviews m " +
+                                "where m.owner = t.owner and m.mview_name = t.table_name)" +
+                                " order by table_name",
                             limitPerKind,
                         ),
                         listOf(pattern) + ownerParameters(environment),
@@ -55,6 +60,31 @@ class OracleCatalog : DialectCatalog {
                             row.getString("owner"),
                             row.getString("table_name"),
                             "TABLE",
+                        )
+                    },
+                )
+            }
+            if (SchemaObjectKind.VIEW in kinds) {
+                addAll(
+                    collectRows(
+                        connection,
+                        environment,
+                        firstRows(
+                            "select owner, view_name, view_type from (" +
+                                "select owner, view_name, 'VIEW' as view_type from all_views " +
+                                "union all " +
+                                "select owner, mview_name, 'MATERIALIZED VIEW' from all_mviews" +
+                                ") where upper(view_name) like ?" + ownerClause(environment, "owner") +
+                                " order by view_name",
+                            limitPerKind,
+                        ),
+                        listOf(pattern) + ownerParameters(environment),
+                    ) { row ->
+                        SchemaMatch(
+                            kind = SchemaObjectKind.VIEW,
+                            owner = row.getString("owner"),
+                            name = row.getString("view_name"),
+                            detail = row.getString("view_type"),
                         )
                     },
                 )
@@ -107,7 +137,6 @@ class OracleCatalog : DialectCatalog {
         }
     }
 
-    /** ALL_SOURCE is stored one row per line, so a range of lines is a plain WHERE clause. */
     override fun readSource(
         connection: Connection,
         environment: DatabaseEnvironment,
@@ -117,6 +146,19 @@ class OracleCatalog : DialectCatalog {
         maxLines: Int,
     ): List<ObjectSource> {
         val firstLine = maxOf(fromLine, 1)
+        return readProgramSource(connection, environment, objectName, objectType, firstLine, maxLines) +
+            readViewSource(connection, environment, objectName, objectType, firstLine, maxLines)
+    }
+
+    /** ALL_SOURCE is stored one row per line, so a range of lines is a plain WHERE clause. */
+    private fun readProgramSource(
+        connection: Connection,
+        environment: DatabaseEnvironment,
+        objectName: String,
+        objectType: String?,
+        firstLine: Int,
+        maxLines: Int,
+    ): List<ObjectSource> {
         val sql = buildString {
             append("select owner, name, type, line, text, total_lines from (")
             append("select owner, name, type, line, text, ")
@@ -155,6 +197,47 @@ class OracleCatalog : DialectCatalog {
             )
         }
     }
+
+    /**
+     * A view keeps its defining query as one LONG value, not as lines, so the range is cut here.
+     * LONG columns cannot be combined with UNION ALL, hence one query per kind of view.
+     */
+    private fun readViewSource(
+        connection: Connection,
+        environment: DatabaseEnvironment,
+        objectName: String,
+        objectType: String?,
+        firstLine: Int,
+        maxLines: Int,
+    ): List<ObjectSource> =
+        listOf(
+            "VIEW" to "select owner, view_name as name, text as definition from all_views where view_name = ?",
+            "MATERIALIZED VIEW" to
+                "select owner, mview_name as name, query as definition from all_mviews where mview_name = ?",
+        )
+            .filter { (viewType, _) -> objectType == null || objectType.equals(viewType, ignoreCase = true) }
+            .flatMap { (viewType, sql) ->
+                collectRows(
+                    connection,
+                    environment,
+                    sql + ownerClause(environment, "owner") + " order by owner",
+                    listOf(objectName.uppercase()) + ownerParameters(environment),
+                ) { row ->
+                    val owner = row.getString("owner")
+                    val name = row.getString("name")
+                    val (slice, totalLines, lastLine) = sliceLines(row.getString("definition"), firstLine, maxLines)
+                    ObjectSource(
+                        owner = owner,
+                        name = name,
+                        type = viewType,
+                        totalLines = totalLines,
+                        fromLine = firstLine,
+                        toLine = lastLine,
+                        hasMore = lastLine < totalLines,
+                        source = slice,
+                    )
+                }
+            }
 
     /**
      * EXPLAIN PLAN writes into PLAN_TABLE and every statement here runs read-only, so Oracle

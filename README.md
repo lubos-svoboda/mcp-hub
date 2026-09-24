@@ -26,7 +26,7 @@ shared by every client session on the machine.
   work only on environments configured as writable.
 - **Guarded answers.** Limits on rows, answer size, text length and query time, per environment,
   and every answer says when a limit cut something off.
-- **Schema tools:** table descriptions, name search, stored program source and execution plans,
+- **Schema tools:** table descriptions, name search, stored program and view source and execution plans,
   answered straight from the data dictionary with no cache to build or go stale.
 - **A log line for every call** with its arguments, duration and outcome.
 
@@ -211,8 +211,8 @@ One setting applies to the whole server and sits directly under `mcp-hub`:
 | `list_environments` | all | Every environment with its type, description, state, since when it holds, the last error, whether it is read-only and pool usage. |
 | `run_sql_query` | databases | Runs one query in a read-only transaction and returns the rows. |
 | `describe_table` | databases | Columns with types as DDL writes them, nullability, keys, check constraints and indexes, for several tables at once. |
-| `search_schema` | databases | Finds tables, columns and stored programs whose name contains a fragment. |
-| `get_object_source` | databases | Source of a stored program as one text, paged by line for long packages. |
+| `search_schema` | databases | Finds tables, views, columns and stored programs whose name contains a fragment. |
+| `get_object_source` | databases | Source of a stored program or the defining query of a view, as one text, paged by line for long packages. |
 | `get_query_plan` | databases | Execution plan. PostgreSQL plans the statement given with `EXPLAIN`; Oracle cannot write to `PLAN_TABLE` read-only, so it reads the plan of a statement that already ran from the cursor cache. |
 | `execute_write_statement` | writable databases | Runs and commits one statement that changes data or structure. |
 | `query_logs` | Grafana | Runs a LogQL query against Loki. |
