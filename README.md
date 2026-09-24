@@ -289,11 +289,12 @@ mcp-hub:
 | `pool.keepalive-seconds` | 120 | How often an idle connection is exercised. |
 | `pool.validation-timeout-seconds` | 5 | How long a liveness check may take. |
 
-One setting applies to the whole server and sits directly under `mcp-hub`:
+Two settings apply to the whole server and sit directly under `mcp-hub`:
 
 | Setting | Default | Purpose |
 |---|---|---|
 | `probe.interval-seconds` | 15 | How often every environment is checked. |
+| `allowed-hosts` | `localhost`, `127.0.0.1`, `::1` | Host names the server answers to. Add one, for example `host.docker.internal`, only when a client reaches the server under that name. |
 
 ## Tools
 
@@ -536,7 +537,10 @@ and `latest`.
 ## Limitations
 
 - **Meant for localhost.** There is no authentication; keep the port bound to the loopback
-  interface.
+  interface. A web page open in your browser could still reach a server on localhost, directly or
+  through DNS rebinding, so every request addressed to a host name outside `allowed-hosts` or
+  sent from a foreign web page (its `Origin` header) is refused. The one exception is Entra
+  posting its sign-in answer to the root.
 - **Character sets are covered by a dependency, not a test.** The test database runs on
   `AL32UTF8`, which the thin driver handles on its own, so no test can fail the way a database on
   a regional character set would. The `orai18n` dependency covers that case; without it such a

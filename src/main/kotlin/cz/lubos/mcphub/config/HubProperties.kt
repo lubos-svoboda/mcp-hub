@@ -8,6 +8,8 @@ data class HubProperties(
     val defaults: EnvironmentDefaults = EnvironmentDefaults(),
     val environments: Map<String, EnvironmentProperties> = emptyMap(),
     val entraAccounts: Map<String, EntraAccountProperties> = emptyMap(),
+    /** Host names the server answers to. Anything else is refused, so a web page cannot reach it by DNS rebinding. */
+    val allowedHosts: List<String> = listOf("localhost", "127.0.0.1", "::1"),
 ) {
     fun resolveSettings(): Map<String, EnvironmentSettings> =
         environments.mapValues { (name, environment) -> resolveEnvironment(name, environment) }
