@@ -1,7 +1,7 @@
 services:
   mcp-hub:
     build: .
-    image: mcp-hub:0.0.1
+    image: mcp-hub
     container_name: mcp-hub
     restart: unless-stopped
     # Published on the loopback interface only: the server has no authentication.

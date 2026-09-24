@@ -10,7 +10,8 @@ spring:
       server:
         protocol: STREAMABLE
         name: mcp-hub
-        version: 0.0.1
+        # Filled in from the Gradle project version when resources are processed.
+        version: "@version@"
         type: SYNC
 
 # Defaults for probing, query limits and pool sizing live in HubProperties.kt and are

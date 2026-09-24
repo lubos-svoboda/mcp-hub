@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "cz.lubos"
-version = "0.0.1-SNAPSHOT"
+version = "0.0.1"
 
 java {
 	toolchain {
@@ -16,6 +16,15 @@ java {
 
 repositories {
 	mavenCentral()
+}
+
+// The version lives only here; application.yaml carries a token that is replaced with it.
+tasks.processResources {
+	val projectVersion = project.version.toString()
+	inputs.property("version", projectVersion)
+	filesMatching("application.yaml") {
+		filter<org.apache.tools.ant.filters.ReplaceTokens>("tokens" to mapOf("version" to projectVersion))
+	}
 }
 
 // Without this, build/libs also holds a plain library jar that the Dockerfile's COPY
