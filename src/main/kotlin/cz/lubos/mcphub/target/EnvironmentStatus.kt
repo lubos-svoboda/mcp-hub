@@ -16,4 +16,6 @@ data class EnvironmentStatus(
     val connectionState: ConnectionState,
     val since: Instant,
     val lastError: String? = null,
+    /** Set while the target is up but lacks something the tools need, for example a datasource. */
+    val note: String? = null,
 )

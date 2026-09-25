@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-09-25
+
+### Added
+
+- An environment that is up but lacks something the tools need carries a note, shown on the status
+  page and reported by `list_environments`; a Grafana instance whose token sees no Loki datasource
+  gets one.
+
+### Fixed
+
+- A Grafana instance whose token was deleted or had expired showed as up, because the probe asked
+  the health endpoint, which needs no token. The probe now uses the token and reports such an
+  instance as down.
+
 ## [0.3.1] - 2026-09-25
 
 ### Fixed
@@ -62,7 +76,8 @@ All notable changes to this project are documented here. The format follows
 - Versions come from git tags; images for `linux/amd64` and `linux/arm64` are published to
   `ghcr.io/lubos-svoboda/mcp-hub`.
 
-[Unreleased]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.1.1...v0.2.0

@@ -98,23 +98,23 @@ class ConnectionProbe(
 
     private fun probe(target: ProbeTarget) {
         try {
-            target.checkReachable()
-            record(target.name, ConnectionState.UP, lastError = null)
+            val note = target.checkReachable()
+            record(target.name, ConnectionState.UP, lastError = null, note = note)
         } catch (failure: Exception) {
-            record(target.name, ConnectionState.DOWN, describe(failure))
+            record(target.name, ConnectionState.DOWN, describe(failure), note = null)
         }
     }
 
     /** Atomic per target, because a requested round may probe a target while the scheduled one does too. */
-    private fun record(environmentName: String, connectionState: ConnectionState, lastError: String?) {
+    private fun record(environmentName: String, connectionState: ConnectionState, lastError: String?, note: String?) {
         var transition: EnvironmentStatus? = null
         statusByEnvironment.compute(environmentName) { _, previousStatus ->
             if (previousStatus != null && previousStatus.connectionState == connectionState) {
                 // Same state as before: refresh the error text, keep `since`, and stay quiet in the
                 // log. Without this a disconnected network would fill the log with identical traces.
-                previousStatus.copy(lastError = lastError)
+                previousStatus.copy(lastError = lastError, note = note)
             } else {
-                EnvironmentStatus(connectionState, Instant.now(), lastError).also { transition = it }
+                EnvironmentStatus(connectionState, Instant.now(), lastError, note).also { transition = it }
             }
         }
         transition?.let { status -> logTransition(environmentName, status) }

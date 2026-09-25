@@ -16,10 +16,22 @@ import org.junit.jupiter.api.assertThrows
 class GrafanaToolsIT {
 
     @Test
-    fun `the instance is reachable with a viewer token`() {
+    fun `the instance is reachable with a viewer token that sees the Loki datasource`() {
         val registry = GrafanaRegistry(GrafanaTestInstance.hubProperties())
 
-        assertDoesNotThrow { registry.requireInstance(ENVIRONMENT_NAME).checkReachable() }
+        val note = assertDoesNotThrow { registry.requireInstance(ENVIRONMENT_NAME).checkReachable() }
+
+        assertThat(note).isNull()
+    }
+
+    /** Grafana answers its health endpoint without a token, so only a checked token tells this apart. */
+    @Test
+    fun `an instance whose token was deleted is down`() {
+        val registry = GrafanaRegistry(GrafanaTestInstance.hubProperties(token = "glsa_deleted_token"))
+
+        val failure = assertThrows<IllegalStateException> { registry.requireInstance(ENVIRONMENT_NAME).checkReachable() }
+
+        assertThat(failure.message).contains("refused the token (HTTP 401)")
     }
 
     @Test

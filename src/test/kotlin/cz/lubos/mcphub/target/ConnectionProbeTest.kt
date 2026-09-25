@@ -114,7 +114,10 @@ class ConnectionProbeTest {
         override val type: EnvironmentType = EnvironmentType.POSTGRESQL
         override val readOnly: Boolean = true
 
-        override fun checkReachable() = check()
+        override fun checkReachable(): String? {
+            check()
+            return null
+        }
     }
 
     private companion object {

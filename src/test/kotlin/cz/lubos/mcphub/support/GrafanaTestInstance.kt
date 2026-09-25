@@ -64,7 +64,7 @@ object GrafanaTestInstance {
         viewerToken = createViewerToken()
     }
 
-    fun hubProperties(readOnly: Boolean = true) = HubProperties(
+    fun hubProperties(readOnly: Boolean = true, token: String = viewerToken) = HubProperties(
         probe = ProbeProperties(intervalSeconds = 3_600),
         defaults = EnvironmentDefaults(connectTimeoutSeconds = 5, socketReadTimeoutSeconds = 30),
         environments = mapOf(
@@ -72,7 +72,7 @@ object GrafanaTestInstance {
                 description = "Integration test Grafana",
                 type = EnvironmentType.GRAFANA,
                 url = url,
-                token = viewerToken,
+                token = token,
                 readOnly = readOnly,
             ),
         ),

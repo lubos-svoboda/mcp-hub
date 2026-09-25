@@ -36,7 +36,8 @@ class HubTools(
             "or POSTGRESQL) and Grafana instances (type GRAFANA). Each entry carries its name, which " +
             "is the value every other tool expects as environment; a description of what it holds " +
             "and when to use it, which is the best guide to choosing between environments; the state (UP, " +
-            "CONNECTING or DOWN) and since when it holds; the last error while DOWN; whether the " +
+            "CONNECTING or DOWN) and since when it holds; the last error while DOWN; a note while UP but " +
+            "lacking something the tools need, such as a Loki datasource; whether the " +
             "environment is read-only; and, for a database, how many pooled connections are in use. " +
             "An environment signing in with Microsoft Entra ID also carries entra: the account, whether it " +
             "is signed in, as whom and until when its token holds. A missing or expired sign-in can only be " +

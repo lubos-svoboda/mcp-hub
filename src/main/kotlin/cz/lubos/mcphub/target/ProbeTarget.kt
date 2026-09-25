@@ -13,7 +13,8 @@ interface ProbeTarget {
     val readOnly: Boolean
 
     /** Throws when the target cannot be reached. The exception carries the reason. */
-    fun checkReachable()
+    // Returns a note when the target answers but lacks something the tools need; null when all is well.
+    fun checkReachable(): String?
 }
 
 /** Implemented by each source of targets, so the probe does not have to know them by name. */

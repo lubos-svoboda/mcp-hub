@@ -20,6 +20,8 @@ data class EnvironmentView(
     val state: ConnectionState,
     val since: String,
     val lastError: String?,
+    /** Set while the environment is up but lacks something the tools need. */
+    val note: String?,
     val readOnly: Boolean,
     val pool: PoolUsage?,
     /** Present when the environment signs in with Microsoft Entra ID. */
@@ -68,6 +70,7 @@ class EnvironmentStatusReporter(
             state = status.connectionState,
             since = status.since.toString(),
             lastError = status.lastError,
+            note = status.note,
             readOnly = target.readOnly,
             // Only a pooled target has a pool; everything else reports none rather than zeros.
             pool = when (target) {

@@ -20,13 +20,14 @@ class DatabaseEnvironment(
     override val type: EnvironmentType get() = settings.type
     override val readOnly: Boolean get() = settings.readOnly
 
-    override fun checkReachable() {
+    override fun checkReachable(): String? {
         val validationTimeoutSeconds = settings.pool.validationTimeoutSeconds.toInt()
         openConnection().use { connection ->
             if (!connection.isValid(validationTimeoutSeconds)) {
                 throw SQLException("Connection did not answer within $validationTimeoutSeconds s")
             }
         }
+        return null
     }
 
     /** The one way to a connection, so that a missing Entra sign-in fails at once rather than after the pool timeout. */

@@ -317,6 +317,10 @@ GRAFANA_PROD:
   in Docker the configuration directory is mounted at `/config`.
 - Logs are read from the first Loki datasource the instance lists, through Grafana's datasource
   proxy, so the one token serves both.
+- The probe lists the datasources with the token rather than asking the health endpoint, which
+  Grafana answers without one. A deleted or expired token therefore shows as down with
+  `Grafana refused the token (HTTP 401)`, and an instance whose token sees no Loki datasource stays
+  up with a note that the log tools cannot work.
 - Redirects are not followed and every endpoint stays on the configured address, because the token
   travels with each request. If Grafana answers with a redirect, point `url` at the final address.
 

@@ -57,7 +57,7 @@ class StatusController(
               <td>${time(view.since)}</td>
               <td>${if (view.readOnly) "read-only" else "<strong>writable</strong>"}${view.entra?.let { "<div class=\"note\">Entra ${escape(it.account)}</div>" } ?: ""}</td>
               <td>${view.pool?.let { "${it.active} active / ${it.idle} idle / ${it.total} total" } ?: "—"}</td>
-              <td class="note">${escape(view.lastError ?: "")}</td>
+              <td class="note">${escape(view.lastError ?: "")}${view.note?.let { """<div class="note warning">${escape(it)}</div>""" } ?: ""}</td>
             </tr>
             """.trimIndent()
         }
@@ -137,6 +137,7 @@ class StatusController(
                 tr.connecting .state { color: #8a6d00; }
                 .note { color: #6b6b6b; font-size: .85em; }
                 .note.error { color: #b3261e; }
+                .note.warning { color: #8a6d00; }
                 header { display: flex; align-items: center; gap: 1rem; margin: 0 0 1rem; }
                 header h1 { margin: 0; }
                 .probe { color: #6b6b6b; display: flex; align-items: center; gap: .4rem; }
@@ -173,6 +174,7 @@ class StatusController(
                   .countdown { background: conic-gradient(#bbb var(--elapsed), #3a3d42 0); }
                   .banner { background: #2f2a17; border-color: #6b5a1e; }
                   .note.error { color: #ef7a72; }
+                  .note.warning { color: #d9b03a; }
                   .spinner { border-color: #3a3d42; border-top-color: #bbb; }
                 }
               </style>

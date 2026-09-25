@@ -106,8 +106,9 @@ class StatusControllerTest {
             override val description = "Answers when released"
             override val type = EnvironmentType.POSTGRESQL
             override val readOnly = true
-            override fun checkReachable() {
+            override fun checkReachable(): String? {
                 release.await(10, TimeUnit.SECONDS)
+                return null
             }
         }
         val registry = object : TargetRegistry {

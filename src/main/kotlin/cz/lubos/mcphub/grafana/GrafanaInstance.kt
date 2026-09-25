@@ -1,5 +1,6 @@
 package cz.lubos.mcphub.grafana
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import cz.lubos.mcphub.config.EnvironmentSettings
 import cz.lubos.mcphub.config.EnvironmentType
 import cz.lubos.mcphub.target.ProbeTarget
@@ -24,11 +25,32 @@ class GrafanaInstance(
 
     private val baseUri: URI = URI.create(baseUrl.trimEnd('/'))
     private val requestTimeout: Duration = Duration.ofSeconds(settings.socketReadTimeoutSeconds.toLong())
+    private val objectMapper = ObjectMapper()
 
-    override fun checkReachable() {
-        val response = send("GET", "/api/health", null)
-        if (response.statusCode() !in 200..299) {
-            throw IllegalStateException("Grafana answered HTTP ${response.statusCode()} on /api/health")
+    /**
+     * Asks for the datasources rather than the health endpoint, which Grafana answers without a token:
+     * a deleted or expired token has to show as down, and the answer also tells whether the log tools
+     * have a Loki datasource to work with.
+     */
+    override fun checkReachable(): String? {
+        val response = send("GET", "/api/datasources", null)
+        return when (response.statusCode()) {
+            in 200..299 ->
+                if (objectMapper.readTree(response.body()).any { it.path("type").asText() == "loki" }) {
+                    null
+                } else {
+                    "No Loki datasource is visible to this token, so query_logs and list_log_labels cannot work."
+                }
+
+            401 -> throw IllegalStateException(
+                "Grafana refused the token (HTTP 401): it may have been deleted or have expired.",
+            )
+
+            403 -> "The token may not list datasources (HTTP 403), so query_logs and list_log_labels cannot work."
+
+            else -> throw IllegalStateException(
+                "Grafana answered HTTP ${response.statusCode()} on /api/datasources: ${response.body().take(200)}",
+            )
         }
     }
 
