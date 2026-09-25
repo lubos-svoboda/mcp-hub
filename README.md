@@ -253,7 +253,7 @@ it, not the file: the file is replaced by renaming a new one next to it.
 
 | Server runs | Clients look for | Mount and settings |
 |---|---|---|
-| Docker Desktop on Windows | `%APPDATA%\postgresql\pgpass.conf` | `-v "$env:APPDATA\postgresql:/pgpass"` (PowerShell), `pgpass-file: /pgpass/pgpass.conf` |
+| Docker Desktop on Windows | `%APPDATA%\postgresql\pgpass.conf` | `-v "$env:APPDATA\postgresql:/pgpass"` (PowerShell), `pgpass-file: /pgpass/pgpass.conf`; see below when that directory cannot be shared |
 | Docker on Linux or macOS | the file `PGPASSFILE` names | `-v ~/.mcp-hub-pgpass:/pgpass --user "$(id -u):$(id -g)"`, `pgpass-file: /pgpass/pgpass`, and `export PGPASSFILE=~/.mcp-hub-pgpass/pgpass` for the clients |
 | Without Docker | `%APPDATA%\postgresql\pgpass.conf` or `~/.pgpass` | the path itself, for example `pgpass-file: /home/you/.pgpass` |
 
@@ -261,6 +261,24 @@ On Linux the container has to run as you: it otherwise runs as a system user of 
 not write into your directory, and a file it created would belong to that user, so you could not
 read it. A directory of its own keeps your home directory out of the container; `PGPASSFILE`
 points the clients at it. Create the directory before starting the container.
+
+On Windows, Docker Desktop mounts only directories it shares, and `AppData` is often not among
+them; the container then fails to start with `the path … is not shared from the host`. Either add
+`%APPDATA%\postgresql` under *Settings → Resources → File sharing*, or keep the file in a directory
+that is shared and point the clients at it, for example next to the configuration:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.mcp-hub\pgpass"
+[Environment]::SetEnvironmentVariable('PGPASSFILE', "$env:USERPROFILE\.mcp-hub\pgpass\pgpass.conf", 'User')
+```
+
+Then mount `%USERPROFILE%\.mcp-hub\pgpass` at `/pgpass` and keep `pgpass-file: /pgpass/pgpass.conf`.
+With Docker Compose, a `compose.override.yaml` next to your configuration keeps the mount out of the
+repository; list both files in `.env` as `COMPOSE_FILE=compose.yaml;<path>\compose.override.yaml`.
+
+A program reads `PGPASSFILE` only when it starts after it was set. An IDE started from a launcher
+such as JetBrains Toolbox inherits the launcher's environment, so quit and restart the launcher
+too; IntelliJ IDEA and DataGrip then find the file with the *pgpass* authentication of a data source.
 
 #### The client ID
 
