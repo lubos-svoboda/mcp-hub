@@ -152,6 +152,22 @@ class PostgresCatalogIT {
         assertThat(result.rows.single()).containsExactly("2026-03-15", "2026-03-15T08:00:45")
     }
 
+    /**
+     * The driver reports timestamptz as a plain TIMESTAMP and refuses to read it without its offset;
+     * the test container's session runs in UTC, so the offset reads as Z.
+     */
+    @Test
+    fun `a timestamp with time zone comes back with its offset`() {
+        val result = withEnvironment { environment ->
+            QueryRunner(ReadOnlySession(), ResultMapper()).run(
+                environment,
+                "select timestamptz '2026-03-15 08:00:45+00' as moment, now() is not null as has_now",
+            )
+        }
+
+        assertThat(result.rows.single()).containsExactly("2026-03-15T08:00:45Z", "t")
+    }
+
     /** bytea is a plain value, not a large object, and reading it as a BLOB fails outright. */
     @Test
     fun `a binary value is summarised by its size`() {

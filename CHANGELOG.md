@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-25
+
+### Fixed
+
+- Queries returning a PostgreSQL `timestamptz` column, such as `now()`, failed; the value now comes
+  back with its offset, for example `2026-09-25T07:55:07Z`.
+
 ## [0.3.0] - 2026-09-24
 
 ### Added
@@ -55,7 +62,8 @@ All notable changes to this project are documented here. The format follows
 - Versions come from git tags; images for `linux/amd64` and `linux/arm64` are published to
   `ghcr.io/lubos-svoboda/mcp-hub`.
 
-[Unreleased]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.1.0...v0.1.1

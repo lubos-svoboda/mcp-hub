@@ -79,8 +79,12 @@ class ResultMapper {
             // Read as a local date-time rather than through java.sql.Timestamp: Oracle DATE and
             // TIMESTAMP hold no zone, and converting via an instant would shift them by whatever
             // the JVM default zone happens to be.
-            Types.TIMESTAMP ->
+            // The PostgreSQL driver reports timestamptz as TIMESTAMP too, but refuses to drop its offset.
+            Types.TIMESTAMP -> if (metaData.getColumnTypeName(columnIndex).equals("timestamptz", ignoreCase = true)) {
+                resultSet.getObject(columnIndex, OffsetDateTime::class.java)?.toString()
+            } else {
                 resultSet.getObject(columnIndex, LocalDateTime::class.java)?.toString()
+            }
 
             // Only a PostgreSQL date arrives as DATE: it has no time of day, and the Oracle driver
             // reports its own DATE, which does, as TIMESTAMP.
