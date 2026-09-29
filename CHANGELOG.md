@@ -6,6 +6,42 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-29
+
+### Added
+
+- Harbor registries as a fourth kind of environment, signed in with a robot account.
+  `list_harbor_artifacts` lists the versions of an image with their tags, push and pull times, size
+  and vulnerabilities by severity, and `harbor_api_request` reads any endpoint of the Harbor API.
+- Once a database refuses the credentials of an environment signing in with a password, the server
+  stops signing in to it, so that repeated attempts cannot lock a shared account. The status page
+  shows a banner with a *Try once* button, and `list_environments` reports the refusal as
+  `credentialRefusal`.
+
+### Changed
+
+- The server reads `secrets.env` itself at every start, so restarting the container is enough after
+  changing a credential. `compose.yaml` no longer passes it with `env_file`, and `docker run` no
+  longer needs `--env-file`. The file is read as a Java properties file: quotes around a value
+  become part of it, and a backslash starts an escape sequence. On Linux, run the container as
+  yourself to keep the file readable by you only.
+- A PostgreSQL `boolean` comes back as `true` or `false` instead of `t` or `f`.
+- A date-time at a full minute keeps its seconds, for example `2026-03-15T00:00:00` instead of
+  `2026-03-15T00:00`.
+- An Oracle `TIMESTAMP WITH TIME ZONE` comes back in ISO-8601 with its offset, a `TIMESTAMP WITH
+  LOCAL TIME ZONE` in UTC, and an interval the way Oracle writes it, for example
+  `+01 02:03:04.500000`.
+- An environment waiting for its Entra sign-in is logged once at `INFO`, and the connection pool no
+  longer repeats a stack trace while it waits.
+
+### Fixed
+
+- A PostgreSQL `numeric` holding `NaN` or `Infinity` failed the whole query.
+- A PostgreSQL `infinity` date or timestamp came back as the largest date Java can hold; it now
+  reads `infinity` or `-infinity`.
+- An Oracle `BOOLEAN` that is null came back as `false`.
+- An Oracle `XMLTYPE` value failed the query, as the driver lacked Oracle's XML libraries.
+
 ## [0.3.2] - 2026-09-25
 
 ### Added
@@ -76,7 +112,8 @@ All notable changes to this project are documented here. The format follows
 - Versions come from git tags; images for `linux/amd64` and `linux/arm64` are published to
   `ghcr.io/lubos-svoboda/mcp-hub`.
 
-[Unreleased]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.2.0...v0.3.0

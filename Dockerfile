@@ -26,5 +26,8 @@ ENV SERVER_ADDRESS=0.0.0.0
 # A file rather than a directory: a directory that cannot be read would be skipped silently,
 # leaving a server with no environments, while a missing file stops the start with an error.
 ENV SPRING_CONFIG_ADDITIONAL_LOCATION=file:/config/application.yaml
+# Read by the server at every start, so a restart picks up changed credentials. Values handed over
+# with --env-file are fixed when the container is created and would win over the file.
+ENV SPRING_CONFIG_IMPORT=optional:file:/config/secrets.env[.properties]
 EXPOSE 8282
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

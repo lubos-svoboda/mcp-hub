@@ -1,6 +1,7 @@
 package cz.lubos.mcphub.entra
 
 import cz.lubos.mcphub.config.EntraAccountProperties
+import cz.lubos.mcphub.target.WaitingForUser
 import java.net.URI
 import java.time.Instant
 
@@ -16,7 +17,7 @@ class EntraToken(
 }
 
 /** Entra no longer accepts the sign-in, so only signing in again helps. */
-class EntraSignInRequiredException(message: String, cause: Throwable? = null) : IllegalStateException(message, cause)
+class EntraSignInRequiredException(message: String, cause: Throwable? = null) : IllegalStateException(message, cause), WaitingForUser
 
 /**
  * The conversation with Entra ID for one account. Kept behind an interface because no test can sign

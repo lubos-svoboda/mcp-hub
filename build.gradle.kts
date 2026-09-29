@@ -71,12 +71,16 @@ dependencies {
 	// The thin driver only knows a handful of character sets on its own. Without this a
 	// database using, for example, EE8ISO8859P2 refuses every connection with ORA-17056.
 	runtimeOnly("com.oracle.database.nls:orai18n:23.26.3.0.0")
+	// The thin driver reads an XMLTYPE value only through these; without them it fails with NoClassDefFoundError.
+	runtimeOnly("com.oracle.database.xml:xdb:23.26.3.0.0")
+	runtimeOnly("com.oracle.database.xml:xmlparserv2:23.26.3.0.0")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testImplementation("org.testcontainers:junit-jupiter")
 	testImplementation("org.testcontainers:oracle-free")
 	testImplementation("org.testcontainers:postgresql")
-	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+	// Also compiled against: JdkXmlParsersSession sets the XML parsers before any test runs.
+	testImplementation("org.junit.platform:junit-platform-launcher")
 }
 
 kotlin {

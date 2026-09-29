@@ -13,6 +13,8 @@ class DatabaseEnvironment(
     val dataSource: HikariDataSource,
     /** Set when the environment signs in with Microsoft Entra ID instead of a password. */
     val entraAccount: EntraAccount? = null,
+    /** Set when the environment signs in with a password, which too many failed attempts would lock. */
+    val credentialGuard: CredentialGuard? = null,
 ) : ProbeTarget, AutoCloseable {
 
     override val name: String get() = settings.name
@@ -33,7 +35,20 @@ class DatabaseEnvironment(
     /** The one way to a connection, so that a missing Entra sign-in fails at once rather than after the pool timeout. */
     fun openConnection(): Connection {
         entraAccount?.requireSignedIn()
-        return dataSource.connection
+        credentialGuard?.requireNotRefused()
+        return try {
+            dataSource.connection
+        } catch (failure: SQLException) {
+            // The pool retries until its timeout and then reports only that; a refusal meanwhile is the real reason.
+            credentialGuard?.requireNotRefused()
+            throw failure
+        }
+    }
+
+    override fun credentialRefusal(): CredentialRefusal? = credentialGuard?.refusal()
+
+    override fun allowOneSignInAttempt() {
+        credentialGuard?.allowOneAttempt()
     }
 
     fun poolUsage(): PoolUsage? =

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Spring Boot's default logging, plus one filter for connection failures the hub raises on purpose. -->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+    <turboFilter class="cz.lubos.mcphub.logging.ExpectedConnectionFailureFilter"/>
+</configuration>

@@ -22,6 +22,7 @@ object PostgresTestDatabase {
     const val SAMPLE_FUNCTION = "sample_double"
     const val SAMPLE_VIEW = "sample_values_view"
     const val SAMPLE_MATERIALIZED_VIEW = "sample_values_totals"
+    const val SAMPLE_ENUM = "sample_state"
     const val CZECH_LABEL = "Přípojný bod Ostrava-Poruba, šířka 12 µm"
 
     private val container =
@@ -72,6 +73,7 @@ object PostgresTestDatabase {
                     )
                     """.trimIndent(),
                 )
+                statement.execute("create type $SAMPLE_ENUM as enum ('planned', 'built')")
                 statement.execute("create index sample_values_label_ix on $SAMPLE_TABLE (label)")
                 statement.execute("create view $SAMPLE_VIEW as select id, label from $SAMPLE_TABLE where label is not null")
                 statement.execute(

@@ -2,6 +2,7 @@ package cz.lubos.mcphub.database
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
+import com.zaxxer.hikari.util.DriverDataSource
 import cz.lubos.mcphub.config.AuthenticationMethod
 import cz.lubos.mcphub.config.EnvironmentType
 import cz.lubos.mcphub.config.EnvironmentProperties
@@ -13,6 +14,7 @@ import cz.lubos.mcphub.target.ProbeTarget
 import cz.lubos.mcphub.target.TargetRegistry
 import org.springframework.stereotype.Component
 import java.time.Duration
+import java.util.Properties
 
 @Component
 class EnvironmentRegistry(
@@ -59,13 +61,21 @@ class EnvironmentRegistry(
             .filterValues { properties -> properties.type.isDatabase }
             .mapValues { (environmentName, properties) ->
                 require(properties.caFile == null) {
-                    "Environment $environmentName sets ca-file, which only a Grafana instance uses. " +
+                    "Environment $environmentName sets ca-file, which only a Grafana or Harbor instance uses. " +
                         "Configure TLS for a database in its JDBC URL instead."
                 }
                 validateAuthentication(environmentName, properties, hubProperties)
                 val settings = settingsByName.getValue(environmentName)
                 val entraAccount = properties.entraAccount?.let(entraAccountRegistry::requireAccount)
-                DatabaseEnvironment(settings, createDataSource(environmentName, properties, settings), entraAccount)
+                // Only a password can be locked; a refused Entra token asks for a new sign-in instead.
+                val credentialGuard = CredentialGuard(environmentName, properties.type)
+                    .takeIf { properties.authentication == AuthenticationMethod.PASSWORD }
+                DatabaseEnvironment(
+                    settings,
+                    createDataSource(environmentName, properties, settings, credentialGuard),
+                    entraAccount,
+                    credentialGuard,
+                )
             }
     }
 
@@ -105,16 +115,20 @@ class EnvironmentRegistry(
         environmentName: String,
         properties: EnvironmentProperties,
         settings: EnvironmentSettings,
+        credentialGuard: CredentialGuard?,
     ): HikariDataSource {
         val configuration = HikariConfig().apply {
             poolName = settings.name
             when (properties.authentication) {
-                AuthenticationMethod.PASSWORD -> {
-                    jdbcUrl = properties.url
-                    username = properties.requireUsername(environmentName)
-                    password = properties.requirePassword(environmentName)
-                    driverTimeouts(settings).forEach { (name, value) -> addDataSourceProperty(name, value) }
-                }
+                AuthenticationMethod.PASSWORD -> dataSource = requireNotNull(credentialGuard).guard(
+                    DriverDataSource(
+                        properties.url,
+                        null,
+                        Properties().apply { driverTimeouts(settings).forEach(::setProperty) },
+                        properties.requireUsername(environmentName),
+                        properties.requirePassword(environmentName),
+                    ),
+                )
 
                 // The token changes every hour or so, so it cannot be a fixed password of the pool.
                 AuthenticationMethod.ENTRA -> dataSource = EntraConnectionSource(
@@ -155,9 +169,9 @@ class EnvironmentRegistry(
                 "socketTimeout" to settings.socketReadTimeoutSeconds.toString(),
             )
 
-            // Unreachable: Grafana environments never reach a connection pool.
-            EnvironmentType.GRAFANA ->
-                error("${settings.name} is a Grafana instance and has no JDBC connection.")
+            // Unreachable: Grafana and Harbor environments never reach a connection pool.
+            EnvironmentType.GRAFANA, EnvironmentType.HARBOR ->
+                error("${settings.name} is a ${settings.type} instance and has no JDBC connection.")
         }
 
     private fun millis(seconds: Long): Long = Duration.ofSeconds(seconds).toMillis()

@@ -54,7 +54,7 @@ class CatalogReader(
             EnvironmentType.ORACLE -> oracleCatalog
             EnvironmentType.POSTGRESQL -> postgresCatalog
             // Unreachable: only database environments become a DatabaseEnvironment at all.
-            EnvironmentType.GRAFANA ->
-                error("${environment.name} is a Grafana instance and has no SQL catalog.")
+            EnvironmentType.GRAFANA, EnvironmentType.HARBOR ->
+                error("${environment.name} is a ${environment.settings.type} instance and has no SQL catalog.")
         }
 }

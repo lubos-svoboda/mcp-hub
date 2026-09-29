@@ -26,6 +26,13 @@ data class EnvironmentView(
     val pool: PoolUsage?,
     /** Present when the environment signs in with Microsoft Entra ID. */
     val entra: EntraAccountView?,
+    /** Present once the database refused the credentials and the hub stopped signing in. */
+    val credentialRefusal: CredentialRefusalView?,
+)
+
+data class CredentialRefusalView(
+    val refusedAt: String,
+    val reason: String,
 )
 
 data class EntraAccountView(
@@ -78,6 +85,9 @@ class EnvironmentStatusReporter(
                 else -> null
             },
             entra = (target as? DatabaseEnvironment)?.entraAccount?.let(::describe),
+            credentialRefusal = target.credentialRefusal()?.let { refusal ->
+                CredentialRefusalView(refusal.refusedAt.toString(), refusal.reason)
+            },
         )
     }
 

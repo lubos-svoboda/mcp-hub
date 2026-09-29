@@ -1,14 +1,8 @@
 package cz.lubos.mcphub.tool
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import cz.lubos.mcphub.grafana.GrafanaInstance
 import cz.lubos.mcphub.grafana.GrafanaRegistry
 import cz.lubos.mcphub.grafana.LokiReader
-import net.thisptr.jackson.jq.BuiltinFunctionLoader
-import net.thisptr.jackson.jq.JsonQuery
-import net.thisptr.jackson.jq.Scope
-import net.thisptr.jackson.jq.Versions
 import org.slf4j.LoggerFactory
 import org.springframework.ai.mcp.annotation.McpTool
 import org.springframework.ai.mcp.annotation.McpToolParam
@@ -22,14 +16,6 @@ class GrafanaTools(
 ) {
 
     private val logger = LoggerFactory.getLogger(this.javaClass)
-    private val objectMapper = ObjectMapper()
-
-    // Loading the builtin functions is the expensive part, so it happens once; every call then
-    // works in a child scope of its own, which is how jackson-jq shares a scope between threads.
-    private val jqRootScope: Scope = Scope.newEmptyScope().also { scope ->
-        BuiltinFunctionLoader.getInstance().loadFunctions(Versions.JQ_1_6, scope)
-    }
-
     @McpTool(
         name = "query_logs",
         description = "Runs a LogQL query against the Loki datasource of a Grafana instance — the " +
@@ -165,23 +151,8 @@ class GrafanaTools(
         return answer
     }
 
-    /** Applies the jq expression when given, and caps whatever is left. */
-    private fun narrow(instance: GrafanaInstance, answer: String, jqExpression: String?): String {
-        val narrowed = if (jqExpression == null) answer else applyJq(answer, jqExpression)
-        val limit = instance.settings.maxResponseCharacters
-        if (narrowed.length <= limit) {
-            return narrowed
-        }
-        return narrowed.take(limit) +
-            "\n… cut at $limit characters; narrow the answer with a jq expression."
-    }
-
-    private fun applyJq(answer: String, jqExpression: String): String {
-        val results = mutableListOf<JsonNode>()
-        JsonQuery.compile(jqExpression, Versions.JQ_1_6)
-            .apply(Scope.newChildScope(jqRootScope), objectMapper.readTree(answer)) { result -> results.add(result) }
-        return results.joinToString("\n") { objectMapper.writeValueAsString(it) }
-    }
+    private fun narrow(instance: GrafanaInstance, answer: String, jqExpression: String?): String =
+        JsonNarrowing.narrow(answer, jqExpression, instance.settings.maxResponseCharacters)
 
     private fun writableInstancesMessage(requestedName: String): String {
         val writableNames = grafanaRegistry.all().filterNot(GrafanaInstance::readOnly).map { it.name }.sorted()

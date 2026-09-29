@@ -4,7 +4,8 @@
 [![Version](https://img.shields.io/github/v/tag/lubos-svoboda/mcp-hub?sort=semver&label=version)](https://github.com/lubos-svoboda/mcp-hub/pkgs/container/mcp-hub)
 
 One long-running [MCP](https://modelcontextprotocol.io) server that gives AI assistants access
-to several Oracle and PostgreSQL databases and Grafana instances through a single set of tools,
+to several Oracle and PostgreSQL databases, Grafana instances and Harbor registries through a
+single set of tools,
 shared by every client session on the machine.
 
 ## Features
@@ -14,8 +15,8 @@ shared by every client session on the machine.
   one.
 - **Shared by every session.** The server speaks streamable HTTP, so every editor window and
   every assistant session on the machine uses the same process and the same connections.
-- **Three kinds of environment:** Oracle, PostgreSQL and Grafana (logs from Loki and the Grafana
-  HTTP API), all configured in one list.
+- **Four kinds of environment:** Oracle, PostgreSQL, Grafana (logs from Loki and the Grafana HTTP
+  API) and Harbor (image versions, their tags and scan results), all configured in one list.
 - **Microsoft Entra ID sign-in for Azure Database for PostgreSQL.** Sign in once on the status
   page; the server renews the access token on its own, so no connection drops when a token
   expires and nothing needs reconnecting.
@@ -59,7 +60,7 @@ With Docker and nothing else installed:
 2. Start the published image:
 
    ```bash
-   docker run -d --name mcp-hub --restart unless-stopped -p 127.0.0.1:8282:8282 -v ~/.mcp-hub:/config:ro --env-file ~/.mcp-hub/secrets.env ghcr.io/lubos-svoboda/mcp-hub
+   docker run -d --name mcp-hub --restart unless-stopped -p 127.0.0.1:8282:8282 -v ~/.mcp-hub:/config:ro ghcr.io/lubos-svoboda/mcp-hub
    ```
 
 - On Windows, write the full path instead of `~`, for example `C:/Users/you/.mcp-hub`.
@@ -102,9 +103,9 @@ mcp-hub:
 
 | Property | Required | Purpose |
 |---|---|---|
-| `type` | yes | `ORACLE`, `POSTGRESQL` or `GRAFANA`. Selects how the environment is reached. |
+| `type` | yes | `ORACLE`, `POSTGRESQL`, `GRAFANA` or `HARBOR`. Selects how the environment is reached. |
 | `description` | yes | Shown to the assistant by `list_environments`. See [writing a description](#writing-a-description). |
-| `url` | yes | JDBC URL of a database, or base address of a Grafana instance. |
+| `url` | yes | JDBC URL of a database, or base address of a Grafana instance or a Harbor registry. |
 | `read-only` | no | `true` by default. Only `false` lets the writing tools change anything. |
 | `authentication` | no | `PASSWORD` by default. `ENTRA` signs a PostgreSQL environment in with Microsoft Entra ID; see [Microsoft Entra ID](#microsoft-entra-id). |
 | `entra-account` | with `ENTRA` | The entry under `mcp-hub.entra-accounts` to sign in with. |
@@ -324,6 +325,34 @@ GRAFANA_PROD:
 - Redirects are not followed and every endpoint stays on the configured address, because the token
   travels with each request. If Grafana answers with a redirect, point `url` at the final address.
 
+### Harbor
+
+```yaml
+HARBOR_TEAM:
+  type: HARBOR
+  description: Container images of the team's services. Use it to find which tags an image has.
+  url: https://harbor.example.internal/
+  project: team
+  username: robot$team+reader
+  token: ${HARBOR_TEAM_TOKEN}
+  ca-file: /config/certs/internal-ca.pem
+```
+
+- `username` and `token` are a
+  [robot account](https://goharbor.io/docs/main/working-with-projects/project-configuration/create-robot-accounts/)
+  and its secret. Pulling and listing the project's repositories and artifacts is enough.
+- `project` is required. The probe checks the credentials against it, and `list_harbor_artifacts`
+  looks for repositories in it.
+- The probe lists one repository of the project rather than reading the project itself, which a
+  robot account usually may not do. A deleted, disabled or expired robot account therefore shows as
+  down with `Harbor refused the credentials (HTTP 401)`.
+- The tools only read, so a Harbor environment is always read-only. `ca-file`, redirects and the
+  configured address work as for Grafana.
+- A repository name may contain slashes, for example `payments/api`. Harbor expects each of
+  them escaped twice in the path, as `%252F`; `list_harbor_artifacts` does that on its own.
+- `scan` of a version is `null` when Harbor has not scanned it or when the account may not see the
+  result.
+
 ### Limits and pool sizing
 
 Every value below has a built-in default. Override it for all environments under
@@ -377,6 +406,8 @@ A few settings apply to the whole server and sit directly under `mcp-hub`:
 | `list_log_labels` | Grafana | Log label names, or the values of one label. |
 | `grafana_api_request` | Grafana | Reads any Grafana HTTP API endpoint, narrowed by an optional jq expression. |
 | `grafana_api_write` | writable Grafana | Changes something through the Grafana API, for example saves a dashboard. |
+| `list_harbor_artifacts` | Harbor | Versions of one image repository, newest first: tags, push and pull time, size and vulnerabilities by severity. |
+| `harbor_api_request` | Harbor | Reads any Harbor API endpoint, narrowed by an optional jq expression. |
 
 Each tool carries the MCP hints `readOnlyHint` and `destructiveHint`, so a client can ask for
 confirmation before the two writing tools run.
@@ -413,6 +444,27 @@ why.
 | <http://127.0.0.1:8282/status> | Every environment with its state, since when it holds, access mode, pool usage and last error, and every Entra account with its state, user, token expiry, last refresh, last error and password file, with a button to sign in or out. *Check now* checks every environment at once and *Check* one of them; while a check runs the page reloads every 2 seconds, otherwise every 10, and times read as how long ago or how soon they are, in your browser's language. `/` redirects here. |
 | <http://127.0.0.1:8282/status.json> | The same as JSON, for scripts and monitoring. |
 
+### Refused credentials
+
+A database account is often shared and locks itself after a few failed logins, for everyone who
+uses it. The pool and the probe would otherwise try a wrong password every few seconds, so once
+the database refuses the credentials of an environment signing in with a password, the server
+stops signing in to it:
+
+- Recognised refusals are Oracle `ORA-01017` (invalid username or password), `ORA-28000` (account
+  locked) and `ORA-28001` (password expired), and PostgreSQL `28P01` (invalid password).
+  PostgreSQL `28000` is not among them: it also covers `pg_hba.conf` refusing the client address,
+  which no retry can lock, and the environment keeps recovering on its own from that.
+- Until the credentials have worked once, the pool and the probe take turns, so a wrong password
+  costs one failed login per start of the server.
+- The status page leads with a red banner naming the environment, when and why it was refused, and
+  a *Try once* button, which also replaces *Check* in its row. Each press is exactly one login
+  attempt; *Check now* leaves refused environments alone. `list_environments` and `status.json`
+  report the refusal as `credentialRefusal`.
+- After correcting `secrets.env`, restart the server, or press *Try once*.
+
+Entra environments are not affected: a refused token asks for a new sign-in instead.
+
 ## Logging
 
 The log is where the server is watched from, so every tool call leaves two lines, numbered to
@@ -431,12 +483,25 @@ is logged with its whole statement, and every change made in Grafana with its me
 Every Entra sign-in and sign-out is logged with the account, the user and the tenant, and so is a
 refresh token Entra refuses. Tokens never appear in the log.
 
+An environment waiting for its Entra sign-in is logged once at `INFO`, without a stack trace. The
+pool's repeated attempts while it waits, or while refused credentials are held back, are not
+logged at all. Every other failure of the pool keeps its warning and stack trace.
+
 ## Running
 
 ### Docker
 
 The [quick start](#quick-start) runs the published image with `docker run`. The configuration
-directory is mounted read-only at `/config`, and `secrets.env` inside it supplies the credentials.
+directory is mounted read-only at `/config`, and the server reads `secrets.env` inside it at
+every start. After changing a credential, restarting the container is enough:
+
+```bash
+docker restart mcp-hub
+```
+
+A container started with `--env-file`, as releases before 0.4.0 described, still works, but it
+keeps the values it was created with: drop `--env-file` and create the container again once.
+
 Moving to a newer release means pulling it and starting the container again:
 
 ```bash
@@ -482,14 +547,20 @@ chmod 644 ~/.mcp-hub/application.yaml
 chmod -R a+rX ~/.mcp-hub/certs    # only if you keep certificates there
 ```
 
-`secrets.env` can stay readable by you only: `docker run --env-file` and Docker Compose both read
-it on the host and hand the values to the container as environment variables.
+The server reads `secrets.env` inside the container, so that user must be able to read it too.
+Rather than opening the file to everyone on the machine, run the container as yourself and keep
+the file readable by you only: add `--user "$(id -u):$(id -g)"` to `docker run`, or
+`user: "1000:1000"` (your `id -u` and `id -g`) to the service in `compose.yaml`.
+
+```bash
+chmod 600 ~/.mcp-hub/secrets.env
+```
 
 ### Without Docker
 
 Any JDK from 17 on runs the Gradle wrapper, which fetches everything else, including a Java 25
-toolchain for the build when none is installed. The server reads `secrets.env` itself, as a
-properties file:
+toolchain for the build when none is installed. The server reads `secrets.env` itself, as it
+does in Docker:
 
 ```bash
 ./gradlew bootRun --args="--spring.config.additional-location=file:$HOME/.mcp-hub/application.yaml --spring.config.import=file:$HOME/.mcp-hub/secrets.env[.properties]"
@@ -498,9 +569,13 @@ properties file:
 The server then listens on `127.0.0.1:8282`. Certificate paths in `ca-file` are paths on your
 machine in this case, not under `/config`.
 
-A backslash in `secrets.env` means something different in each case: Docker takes it
-literally, while the properties format treats it as the start of an escape sequence. Without
-Docker, write a password containing a backslash with the backslash doubled.
+`secrets.env` is read as a Java properties file, in Docker and without it alike:
+
+- A backslash starts an escape sequence, so write a password containing a backslash with the
+  backslash doubled.
+- Quotes around a value become part of it; write the value bare.
+- The file is read as ISO-8859-1. Write any other character as a `\u` escape, for example `č`
+  for `č`.
 
 ## Connecting a client
 

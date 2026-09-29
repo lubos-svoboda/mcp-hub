@@ -1,16 +1,12 @@
 package cz.lubos.mcphub.grafana
 
 import cz.lubos.mcphub.config.AuthenticationMethod
-import cz.lubos.mcphub.config.EnvironmentProperties
-import cz.lubos.mcphub.config.EnvironmentSettings
 import cz.lubos.mcphub.config.EnvironmentType
 import cz.lubos.mcphub.config.HubProperties
+import cz.lubos.mcphub.http.HttpApi
 import cz.lubos.mcphub.target.ProbeTarget
 import cz.lubos.mcphub.target.TargetRegistry
 import org.springframework.stereotype.Component
-import java.net.http.HttpClient
-import java.nio.file.Path
-import java.time.Duration
 
 /** Reads the same environment map as the databases do, taking the Grafana ones. */
 @Component
@@ -48,17 +44,8 @@ class GrafanaRegistry(hubProperties: HubProperties) : TargetRegistry {
                     settings = settings,
                     baseUrl = properties.url,
                     token = properties.requireToken(environmentName),
-                    httpClient = createHttpClient(properties, settings),
+                    httpClient = HttpApi.createHttpClient(properties.caFile, settings.connectTimeoutSeconds),
                 )
             }
     }
-
-    /** One client per instance, because each may trust its own certificate authority. */
-    private fun createHttpClient(properties: EnvironmentProperties, settings: EnvironmentSettings): HttpClient =
-        HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(settings.connectTimeoutSeconds.toLong()))
-            // A redirect could carry the token to another host, so none is followed.
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .apply { properties.caFile?.let { caFile -> sslContext(sslContextTrusting(Path.of(caFile))) } }
-            .build()
 }

@@ -71,6 +71,8 @@ class ConnectionProbe(
     fun probeInBackground(environmentName: String) {
         val target = allTargets().firstOrNull { it.name == environmentName }
             ?: throw IllegalArgumentException("Unknown environment '$environmentName'.")
+        // Asked for this one environment by name, so refused credentials get their single new attempt.
+        target.allowOneSignInAttempt()
         roundsRunning.incrementAndGet()
         Thread.ofVirtual().name("requested-probe").start {
             try {
@@ -101,12 +103,18 @@ class ConnectionProbe(
             val note = target.checkReachable()
             record(target.name, ConnectionState.UP, lastError = null, note = note)
         } catch (failure: Exception) {
-            record(target.name, ConnectionState.DOWN, describe(failure), note = null)
+            record(target.name, ConnectionState.DOWN, describe(failure), note = null, expected = failure is WaitingForUser)
         }
     }
 
     /** Atomic per target, because a requested round may probe a target while the scheduled one does too. */
-    private fun record(environmentName: String, connectionState: ConnectionState, lastError: String?, note: String?) {
+    private fun record(
+        environmentName: String,
+        connectionState: ConnectionState,
+        lastError: String?,
+        note: String?,
+        expected: Boolean = false,
+    ) {
         var transition: EnvironmentStatus? = null
         statusByEnvironment.compute(environmentName) { _, previousStatus ->
             if (previousStatus != null && previousStatus.connectionState == connectionState) {
@@ -117,13 +125,17 @@ class ConnectionProbe(
                 EnvironmentStatus(connectionState, Instant.now(), lastError, note).also { transition = it }
             }
         }
-        transition?.let { status -> logTransition(environmentName, status) }
+        transition?.let { status -> logTransition(environmentName, status, expected) }
     }
 
-    private fun logTransition(environmentName: String, status: EnvironmentStatus) {
+    private fun logTransition(environmentName: String, status: EnvironmentStatus, expected: Boolean) {
         when (status.connectionState) {
             ConnectionState.UP -> logger.info("Environment {} is reachable", environmentName)
-            ConnectionState.DOWN -> logger.warn("Environment {} is unreachable: {}", environmentName, status.lastError)
+            ConnectionState.DOWN -> if (expected) {
+                logger.info("Environment {} waits: {}", environmentName, status.lastError)
+            } else {
+                logger.warn("Environment {} is unreachable: {}", environmentName, status.lastError)
+            }
             ConnectionState.CONNECTING -> logger.info("Environment {} is connecting", environmentName)
         }
     }

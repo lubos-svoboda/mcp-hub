@@ -33,7 +33,7 @@ class HubTools(
     @McpTool(
         name = "list_environments",
         description = "Lists every environment this server is connected to: databases (type ORACLE " +
-            "or POSTGRESQL) and Grafana instances (type GRAFANA). Each entry carries its name, which " +
+            "or POSTGRESQL), Grafana instances (type GRAFANA) and Harbor registries (type HARBOR). Each entry carries its name, which " +
             "is the value every other tool expects as environment; a description of what it holds " +
             "and when to use it, which is the best guide to choosing between environments; the state (UP, " +
             "CONNECTING or DOWN) and since when it holds; the last error while DOWN; a note while UP but " +
@@ -42,6 +42,9 @@ class HubTools(
             "An environment signing in with Microsoft Entra ID also carries entra: the account, whether it " +
             "is signed in, as whom and until when its token holds. A missing or expired sign-in can only be " +
             "completed by the user in a browser on the server's status page, never by a tool. " +
+            "An environment whose database refused its password carries credentialRefusal: the server " +
+            "stopped signing in so the account is not locked, and only the user can retry it, again on the " +
+            "status page. " +
             "Start here when unsure which environments exist or why one fails.",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,

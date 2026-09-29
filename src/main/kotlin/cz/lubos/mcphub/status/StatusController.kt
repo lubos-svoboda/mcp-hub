@@ -53,7 +53,7 @@ class StatusController(
             <tr class="${view.state.name.lowercase()}">
               <td>${escape(view.name)}<div class="note">${escape(view.description)}</div></td>
               <td>${view.type}</td>
-              <td class="state">${view.state}<form method="post" action="/status/check/${URLEncoder.encode(view.name, StandardCharsets.UTF_8)}"><button type="submit" class="small" title="Check this environment now">Check</button></form></td>
+              <td class="state">${view.state}<form method="post" action="/status/check/${URLEncoder.encode(view.name, StandardCharsets.UTF_8)}">${if (view.credentialRefusal == null) """<button type="submit" class="small" title="Check this environment now">Check</button>""" else """<button type="submit" class="small" title="Sign in once with the configured credentials">Try once</button>"""}</form></td>
               <td>${time(view.since)}</td>
               <td>${if (view.readOnly) "read-only" else "<strong>writable</strong>"}${view.entra?.let { "<div class=\"note\">Entra ${escape(it.account)}</div>" } ?: ""}</td>
               <td>${view.pool?.let { "${it.active} active / ${it.idle} idle / ${it.total} total" } ?: "—"}</td>
@@ -108,6 +108,18 @@ class StatusController(
             """.trimIndent()
         }
 
+        // Nothing retries these on its own, so they stay in view until someone acts.
+        val refusalBanners = environments.filter { it.credentialRefusal != null }.joinToString("\n") { view ->
+            val refusal = requireNotNull(view.credentialRefusal)
+            val path = URLEncoder.encode(view.name, StandardCharsets.UTF_8)
+            """
+            <div class="banner refused"><div>Environment <strong>${escape(view.name)}</strong> refused its credentials
+              ${time(refusal.refusedAt)}, so the hub stopped signing in to keep the account from being locked.
+              Correct them and restart the hub, or try once.<div class="note">${escape(refusal.reason)}</div></div>
+              <form method="post" action="/status/check/$path"><button type="submit">Try once</button></form></div>
+            """.trimIndent()
+        }
+
         // While a round runs the page reloads quickly, so the outcome shows as soon as it is known.
         val probing = connectionProbe.isProbing
         val reloadSeconds = if (probing) 2 else 10
@@ -152,7 +164,8 @@ class StatusController(
                 h2 { font-size: 1rem; margin: 2rem 0 .5rem; }
                 .banner { display: flex; align-items: center; gap: .6rem; margin: 0 0 1rem; padding: .6rem .8rem;
                   border: 1px solid #e6c65c; border-radius: 6px; background: #fff8dc; }
-                .banner .button { margin-left: auto; }
+                .banner .button, .banner form { margin-left: auto; }
+                .banner.refused { border-color: #e0a19c; background: #fdecea; }
                 button.small { display: block; margin-top: .25rem; padding: 0 .45rem; font-size: .8em; font-weight: normal; }
                 tr.signed_in .state { color: #197d3a; }
                 tr.sign_in_required .state { color: #b3261e; }
@@ -173,6 +186,7 @@ class StatusController(
                   .button, button { background: #26282c; border-color: #3a3d42; }
                   .countdown { background: conic-gradient(#bbb var(--elapsed), #3a3d42 0); }
                   .banner { background: #2f2a17; border-color: #6b5a1e; }
+                  .banner.refused { background: #3a1d1b; border-color: #7a3530; }
                   .note.error { color: #ef7a72; }
                   .note.warning { color: #d9b03a; }
                   .spinner { border-color: #3a3d42; border-top-color: #bbb; }
@@ -185,6 +199,7 @@ class StatusController(
                 <span class="probe">$probeState</span>
                 <form method="post" action="/status/check"><button type="submit">Check now</button></form>
               </header>
+              $refusalBanners
               $banners
               <table>
                 <tr><th>Environment</th><th>Type</th><th>State</th><th>Since</th><th>Access</th><th>Pool</th><th>Last error</th></tr>

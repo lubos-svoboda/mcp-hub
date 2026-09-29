@@ -2,12 +2,15 @@ package cz.lubos.mcphub.query
 
 import cz.lubos.mcphub.config.EnvironmentSettings
 import org.springframework.stereotype.Component
+import java.math.BigDecimal
 import java.sql.ResultSet
 import java.sql.ResultSetMetaData
 import java.sql.Types
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 /**
  * Columns are listed once and rows hold bare values, which costs far fewer tokens than
@@ -81,21 +84,42 @@ class ResultMapper {
             // the JVM default zone happens to be.
             // The PostgreSQL driver reports timestamptz as TIMESTAMP too, but refuses to drop its offset.
             Types.TIMESTAMP -> if (metaData.getColumnTypeName(columnIndex).equals("timestamptz", ignoreCase = true)) {
-                resultSet.getObject(columnIndex, OffsetDateTime::class.java)?.toString()
+                resultSet.getObject(columnIndex, OffsetDateTime::class.java)?.let(::formatOffsetDateTime)
             } else {
-                resultSet.getObject(columnIndex, LocalDateTime::class.java)?.toString()
+                resultSet.getObject(columnIndex, LocalDateTime::class.java)?.let(::formatLocalDateTime)
             }
 
             // Only a PostgreSQL date arrives as DATE: it has no time of day, and the Oracle driver
             // reports its own DATE, which does, as TIMESTAMP.
             Types.DATE ->
-                resultSet.getObject(columnIndex, LocalDate::class.java)?.toString()
+                resultSet.getObject(columnIndex, LocalDate::class.java)?.let(::formatLocalDate)
 
-            Types.TIMESTAMP_WITH_TIMEZONE ->
-                resultSet.getObject(columnIndex, OffsetDateTime::class.java)?.toString()
+            Types.TIMESTAMP_WITH_TIMEZONE, ORACLE_TIMESTAMP_WITH_TIME_ZONE ->
+                resultSet.getObject(columnIndex, OffsetDateTime::class.java)?.let(::formatOffsetDateTime)
 
-            Types.NUMERIC, Types.DECIMAL ->
-                resultSet.getBigDecimal(columnIndex)?.toPlainString()
+            // The session shows it in the JVM's zone, which differs between machines; UTC reads the same everywhere.
+            ORACLE_TIMESTAMP_WITH_LOCAL_TIME_ZONE ->
+                resultSet.getTimestamp(columnIndex)?.toInstant()?.atOffset(ZoneOffset.UTC)?.let(::formatOffsetDateTime)
+
+            ORACLE_INTERVAL_DAY_TO_SECOND -> resultSet.getString(columnIndex)?.let { text ->
+                formatIntervalDayToSecond(text, metaData.getPrecision(columnIndex), metaData.getScale(columnIndex))
+            }
+
+            ORACLE_INTERVAL_YEAR_TO_MONTH -> resultSet.getString(columnIndex)?.let { text ->
+                formatIntervalYearToMonth(text, metaData.getPrecision(columnIndex))
+            }
+
+            // A PostgreSQL numeric may also be NaN or infinite, which BigDecimal cannot hold.
+            Types.NUMERIC, Types.DECIMAL -> resultSet.getString(columnIndex)?.let { text ->
+                if (text in NON_FINITE_NUMBERS) text else BigDecimal(text).toPlainString()
+            }
+
+            // PostgreSQL reports its boolean as BIT, and the Oracle driver reads a null BOOLEAN as "false".
+            Types.BOOLEAN, Types.BIT -> if (metaData.getColumnTypeName(columnIndex).lowercase() in BOOLEAN_TYPE_NAMES) {
+                resultSet.getBoolean(columnIndex).takeUnless { resultSet.wasNull() }?.toString()
+            } else {
+                resultSet.getString(columnIndex)
+            }
 
             Types.CLOB, Types.NCLOB ->
                 readClob(resultSet, columnIndex, maxTextValueCharacters)
@@ -130,4 +154,54 @@ class ResultMapper {
     }
 
     private fun describeBinary(length: Long) = "<binary, $length bytes>"
+
+    // The PostgreSQL driver turns infinity into the largest value Java can hold. toString would
+    // drop the seconds at a full minute; the ISO formatter always writes them.
+    private fun formatLocalDateTime(value: LocalDateTime): String = when (value) {
+        LocalDateTime.MAX -> "infinity"
+        LocalDateTime.MIN -> "-infinity"
+        else -> DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(value)
+    }
+
+    private fun formatOffsetDateTime(value: OffsetDateTime): String = when (value) {
+        OffsetDateTime.MAX -> "infinity"
+        OffsetDateTime.MIN -> "-infinity"
+        else -> DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(value)
+    }
+
+    private fun formatLocalDate(value: LocalDate): String = when (value) {
+        LocalDate.MAX -> "infinity"
+        LocalDate.MIN -> "-infinity"
+        else -> value.toString()
+    }
+
+    /** Written the way Oracle itself writes it, `+01 02:03:04.500000`, rather than the driver's `1 2:3:4.5`. */
+    private fun formatIntervalDayToSecond(text: String, dayPrecision: Int, secondPrecision: Int): String {
+        val match = INTERVAL_DAY_TO_SECOND.matchEntire(text) ?: return text
+        val (sign, days, hours, minutes, seconds, fraction) = match.destructured
+        val fractionText = if (secondPrecision > 0) "." + fraction.padEnd(secondPrecision, '0') else ""
+        return "${intervalSign(sign)}${days.padStart(dayPrecision, '0')} " +
+            "${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}$fractionText"
+    }
+
+    private fun formatIntervalYearToMonth(text: String, yearPrecision: Int): String {
+        val match = INTERVAL_YEAR_TO_MONTH.matchEntire(text) ?: return text
+        val (sign, years, months) = match.destructured
+        return "${intervalSign(sign)}${years.padStart(yearPrecision, '0')}-${months.padStart(2, '0')}"
+    }
+
+    private fun intervalSign(sign: String) = if (sign == "-") "-" else "+"
+
+    private companion object {
+        // Oracle's own type codes, outside java.sql.Types; the driver is only on the runtime classpath.
+        const val ORACLE_TIMESTAMP_WITH_TIME_ZONE = -101
+        const val ORACLE_TIMESTAMP_WITH_LOCAL_TIME_ZONE = -102
+        const val ORACLE_INTERVAL_YEAR_TO_MONTH = -103
+        const val ORACLE_INTERVAL_DAY_TO_SECOND = -104
+
+        val NON_FINITE_NUMBERS = setOf("NaN", "Infinity", "-Infinity")
+        val BOOLEAN_TYPE_NAMES = setOf("bool", "boolean")
+        val INTERVAL_DAY_TO_SECOND = Regex("""(-?)(\d+) (\d+):(\d+):(\d+)(?:\.(\d+))?""")
+        val INTERVAL_YEAR_TO_MONTH = Regex("""(-?)(\d+)-(\d+)""")
+    }
 }

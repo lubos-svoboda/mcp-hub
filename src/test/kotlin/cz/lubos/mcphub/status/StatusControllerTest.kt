@@ -7,6 +7,7 @@ import cz.lubos.mcphub.config.EnvironmentProperties
 import cz.lubos.mcphub.config.EnvironmentType
 import cz.lubos.mcphub.config.HubProperties
 import cz.lubos.mcphub.config.PoolDefaults
+import cz.lubos.mcphub.database.CredentialRefusal
 import cz.lubos.mcphub.database.EnvironmentRegistry
 import cz.lubos.mcphub.entra.EntraAccountRegistry
 import cz.lubos.mcphub.entra.EntraAccountState
@@ -22,6 +23,7 @@ import cz.lubos.mcphub.support.awaitIdle
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import java.time.Instant
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -125,6 +127,38 @@ class StatusControllerTest {
 
         assertThat(whileChecking).contains("Checking environments").contains("""content="2"""")
         assertThat(afterwards).contains("""Checked <time datetime="20""").contains("countdown").contains("""content="10"""").doesNotContain("spinner\"")
+    }
+
+    @Test
+    fun `an environment that refused its credentials leads the page and offers a single attempt`() {
+        val refusedTarget = object : ProbeTarget {
+            override val name = "ORACLE_SHARED_DB"
+            override val description = "Signs in with a shared account"
+            override val type = EnvironmentType.ORACLE
+            override val readOnly = true
+            override fun checkReachable(): String? = throw java.sql.SQLException("ORA-01017: invalid username/password")
+            override fun credentialRefusal() =
+                CredentialRefusal(Instant.parse("2026-09-29T08:00:00Z"), "ORA-01017: invalid username/password")
+        }
+        val registry = object : TargetRegistry {
+            override fun targets(): Collection<ProbeTarget> = listOf(refusedTarget)
+        }
+        val probe = ConnectionProbe(listOf(registry), HubProperties())
+        val reporter = EnvironmentStatusReporter(listOf(registry), probe, accounts, PgpassExport(hubProperties, accounts))
+
+        val page = StatusController(reporter, probe).statusAsPage()
+        val environment = StatusController(reporter, probe).statusAsJson().single()
+
+        assertThat(page).contains("""<div class="banner refused">""")
+            .contains("<strong>ORACLE_SHARED_DB</strong> refused its credentials")
+            .contains("""<form method="post" action="/status/check/ORACLE_SHARED_DB"><button type="submit">Try once</button>""")
+            .contains("ORA-01017: invalid username/password")
+        assertThat(environment.credentialRefusal?.refusedAt).isEqualTo("2026-09-29T08:00:00Z")
+    }
+
+    @Test
+    fun `a page without refused credentials has no refusal banner`() {
+        assertThat(controller.statusAsPage()).doesNotContain("banner refused")
     }
 
     private companion object {

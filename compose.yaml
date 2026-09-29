@@ -8,14 +8,13 @@ services:
     # Published on the loopback interface only: the server has no authentication.
     ports:
       - "127.0.0.1:8282:8282"
-    env_file:
-      - ${MCP_HUB_CONFIG:?set MCP_HUB_CONFIG to your configuration directory, see README}/secrets.env
     # Docker Desktop defines host.docker.internal on its own; Docker Engine on Linux needs this line
     # before a container can reach a database running on the host.
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ${MCP_HUB_CONFIG}:/config:ro
+      # secrets.env inside it is read by the server itself at every start, so a restart picks up a change.
+      - ${MCP_HUB_CONFIG:?set MCP_HUB_CONFIG to your configuration directory, see README}:/config:ro
       # Optional, for an Entra account's pgpass-file: the directory holding the password file,
       # writable. On Windows the one PostgreSQL clients read; on Linux a directory of its own, with
       # `user: "1000:1000"` (your id -u and id -g) above so that the file belongs to you.

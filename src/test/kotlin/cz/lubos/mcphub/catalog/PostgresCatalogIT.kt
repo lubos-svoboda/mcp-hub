@@ -165,7 +165,7 @@ class PostgresCatalogIT {
             )
         }
 
-        assertThat(result.rows.single()).containsExactly("2026-03-15T08:00:45Z", "t")
+        assertThat(result.rows.single()).containsExactly("2026-03-15T08:00:45Z", "true")
     }
 
     /** bytea is a plain value, not a large object, and reading it as a BLOB fails outright. */

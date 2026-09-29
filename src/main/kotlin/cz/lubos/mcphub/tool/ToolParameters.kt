@@ -11,3 +11,6 @@ internal const val GRAFANA_ENVIRONMENT =
 internal const val JQ_EXPRESSION =
     "Optional jq expression applied to the JSON answer before it is returned, so that only the " +
         "part needed comes back."
+
+internal const val HARBOR_ENVIRONMENT =
+    "Name of a Harbor registry, exactly as list_environments reports it (type HARBOR)."

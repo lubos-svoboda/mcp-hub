@@ -70,9 +70,10 @@ enum class EnvironmentType {
     ORACLE,
     POSTGRESQL,
     GRAFANA,
+    HARBOR,
     ;
 
-    val isDatabase: Boolean get() = this != GRAFANA
+    val isDatabase: Boolean get() = this == ORACLE || this == POSTGRESQL
 }
 
 enum class AuthenticationMethod {
@@ -120,12 +121,14 @@ data class EnvironmentProperties(
     val password: String? = null,
     val token: String? = null,
     /**
-     * PEM file with the certificates a Grafana instance's HTTPS endpoint is trusted by, replacing
+     * PEM file with the certificates a Grafana or Harbor instance's HTTPS endpoint is trusted by, replacing
      * the JVM's default authorities for that instance only. Databases configure TLS in their URL.
      */
     val caFile: String? = null,
     /** Restricts catalog lookups to one owner. Null means every schema the account can see. */
     val schema: String? = null,
+    /** The Harbor project the tools work in and the probe checks the token against; required for HARBOR only. */
+    val project: String? = null,
     val readOnly: Boolean = true,
     val maxRows: Int? = null,
     val queryTimeoutSeconds: Int? = null,
@@ -148,7 +151,11 @@ data class EnvironmentProperties(
     }
 
     fun requireToken(environmentName: String): String = checkNotNull(token) {
-        "Environment $environmentName is a Grafana instance and needs a token."
+        "Environment $environmentName is a $type instance and needs a token."
+    }
+
+    fun requireProject(environmentName: String): String = checkNotNull(project) {
+        "Environment $environmentName is a Harbor registry and needs the project its tools work in."
     }
 
     override fun toString() =
