@@ -91,8 +91,8 @@ class ToolCallAspect {
     }
 
     private companion object {
-        const val ARGUMENT_CHARACTERS = 160
-        const val LINE_CHARACTERS = 400
+        const val ARGUMENT_CHARACTERS = 2_000
+        const val LINE_CHARACTERS = 4_000
         val WHITESPACE = Regex("\\s+")
     }
 }

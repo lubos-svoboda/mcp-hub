@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-08
+
+### Changed
+
+- While the network does not reach a database, for example with the VPN disconnected, the
+  connection pool no longer logs a warning with a stack trace at every retry. The environment going
+  down is still logged once, with the reason.
+- A tool call's arguments are logged up to 2000 characters each instead of 160, so most queries
+  appear in the log whole.
+
 ## [0.4.0] - 2026-09-29
 
 ### Added
@@ -112,7 +122,8 @@ All notable changes to this project are documented here. The format follows
 - Versions come from git tags; images for `linux/amd64` and `linux/arm64` are published to
   `ghcr.io/lubos-svoboda/mcp-hub`.
 
-[Unreleased]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.0...v0.3.1

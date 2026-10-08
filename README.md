@@ -484,8 +484,10 @@ Every Entra sign-in and sign-out is logged with the account, the user and the te
 refresh token Entra refuses. Tokens never appear in the log.
 
 An environment waiting for its Entra sign-in is logged once at `INFO`, without a stack trace. The
-pool's repeated attempts while it waits, or while refused credentials are held back, are not
-logged at all. Every other failure of the pool keeps its warning and stack trace.
+pool's repeated attempts while it waits, while refused credentials are held back, or while the
+network does not reach the database, for example with the VPN disconnected, are not logged at
+all; the environment's change of state is. Every other failure of the pool keeps its warning and
+stack trace.
 
 ## Running
 

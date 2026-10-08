@@ -7,12 +7,17 @@ import ch.qos.logback.core.spi.FilterReply
 import cz.lubos.mcphub.database.CredentialsRefusedException
 import cz.lubos.mcphub.entra.EntraSignInRequiredException
 import org.slf4j.Marker
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 
 /**
- * Drops the pool's warning with a stack trace for failures the hub raised on purpose: a signed-out
- * Entra account, or credentials the guard stopped using. The pool retries every few seconds, so each
- * would repeat the same trace for as long as it lasts; ConnectionProbe logs the state once instead.
- * Every other warning of the pool is kept.
+ * Drops the pool's warning with a stack trace for failures the hub raised on purpose, a signed-out
+ * Entra account or credentials the guard stopped using, and for a network that does not reach the
+ * database, such as a disconnected VPN. The pool retries every few seconds, so each would repeat the
+ * same trace for as long as it lasts; ConnectionProbe logs the state once instead. Every other
+ * warning of the pool is kept.
  */
 class ExpectedConnectionFailureFilter : TurboFilter() {
 
@@ -36,6 +41,11 @@ class ExpectedConnectionFailureFilter : TurboFilter() {
         const val POOL_LOGGERS = "com.zaxxer.hikari"
 
         fun isExpected(failure: Throwable) =
-            failure is EntraSignInRequiredException || failure is CredentialsRefusedException
+            failure is EntraSignInRequiredException || failure is CredentialsRefusedException || isNetworkFailure(failure)
+
+        /** Both drivers keep the JDK's network exception as a cause, whatever their own error says. */
+        fun isNetworkFailure(failure: Throwable) =
+            failure is UnknownHostException || failure is ConnectException || failure is NoRouteToHostException ||
+                failure is SocketTimeoutException
     }
 }

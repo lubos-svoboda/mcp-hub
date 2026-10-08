@@ -7,6 +7,10 @@ import cz.lubos.mcphub.database.CredentialsRefusedException
 import cz.lubos.mcphub.entra.EntraSignInRequiredException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import java.sql.DriverManager
 import java.sql.SQLException
 
 class ExpectedConnectionFailureFilterTest {
@@ -42,6 +46,24 @@ class ExpectedConnectionFailureFilterTest {
         poolWarns(SQLException("Connection refused", "08001"))
 
         assertThat(appender.list).singleElement().satisfies({ event -> assertThat(event.throwableProxy.message).isEqualTo("Connection refused") })
+    }
+
+    /** The drivers' own failures, not made-up ones: a host that does not resolve and a port nobody listens on. */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+        strings = [
+            "jdbc:postgresql://no-such-host.invalid:5432/hub",
+            "jdbc:oracle:thin:@//no-such-host.invalid:1521/HUB",
+            "jdbc:postgresql://127.0.0.1:1/hub",
+            "jdbc:oracle:thin:@//127.0.0.1:1/HUB",
+        ],
+    )
+    fun `a database the network does not reach leaves no trace in the pool log`(url: String) {
+        val failure = assertThrows<SQLException> { DriverManager.getConnection(url, "hub", "secret").close() }
+
+        poolWarns(failure)
+
+        assertThat(appender.list).isEmpty()
     }
 
     @Test
