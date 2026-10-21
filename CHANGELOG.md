@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-21
+
+### Changed
+
+- The status page shows the version at the right of its header with the date and time of the
+  release, or of a local build, instead of how long ago it was built.
+
 ## [0.5.0] - 2026-10-21
 
 ### Added
@@ -141,7 +148,8 @@ All notable changes to this project are documented here. The format follows
 - Versions come from git tags; images for `linux/amd64` and `linux/arm64` are published to
   `ghcr.io/lubos-svoboda/mcp-hub`.
 
-[Unreleased]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.2...v0.4.0

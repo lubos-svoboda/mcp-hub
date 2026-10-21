@@ -166,12 +166,12 @@ class StatusControllerTest {
     }
 
     @Test
-    fun `the header shows the running version, linked to its release, and when it was built`() {
+    fun `the header shows the running version, linked to its release, and when it was released`() {
         val page = controller.statusAsPage()
 
         assertThat(page)
             .contains("""<a href="https://github.com/lubos-svoboda/mcp-hub/releases/tag/v0.5.0">v0.5.0</a>""")
-            .contains("""built <time datetime="2026-10-21T08:00:00Z">""")
+            .contains("""released <time class="exact" datetime="2026-10-21T08:00:00Z">""")
             .doesNotContain("is available")
     }
 

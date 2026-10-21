@@ -121,8 +121,12 @@ class StatusController(
             """.trimIndent()
         }
 
+        // A release is built from its tag, so its build time is when it was released; a local build only says when it was built.
         val version = releaseCheck.currentVersion?.let { currentVersion ->
-            val built = releaseCheck.builtAt?.let { " · built ${time(it.toString())}" } ?: ""
+            val built = releaseCheck.builtAt?.let { builtAt ->
+                val what = if (ReleaseCheck.RELEASE_VERSION.matches(currentVersion)) "released" else "built"
+                """ · $what <time class="exact" datetime="$builtAt">$builtAt</time>"""
+            } ?: ""
             """<span class="version"><a href="${escape(releaseCheck.currentVersionUrl)}">v${escape(currentVersion)}</a>$built</span>"""
         } ?: """<span class="version"><a href="${ReleaseCheck.REPOSITORY_URL}">GitHub</a></span>"""
         val newerReleaseBanner = releaseCheck.newerRelease()?.let { release ->
@@ -167,7 +171,7 @@ class StatusController(
                 header { display: flex; align-items: center; gap: 1rem; margin: 0 0 1rem; }
                 header h1 { margin: 0; }
                 .probe { color: #6b6b6b; display: flex; align-items: center; gap: .4rem; }
-                .version { color: #6b6b6b; font-size: .9em; }
+                .version { color: #6b6b6b; font-size: .9em; margin-left: auto; }
                 .version a { color: inherit; }
                 .spinner { width: .9em; height: .9em; border: 2px solid #c9c9c9; border-top-color: #555;
                   border-radius: 50%; animation: spin .8s linear infinite; }
@@ -212,9 +216,9 @@ class StatusController(
             <body>
               <header>
                 <h1>MCP Hub</h1>
-                $version
                 <span class="probe">$probeState</span>
                 <form method="post" action="/status/check"><button type="submit">Check now</button></form>
+                $version
               </header>
               $refusalBanners
               $banners
@@ -229,7 +233,10 @@ class StatusController(
                 // reads as how long ago or how soon it is, with the exact moment shown on hover.
                 const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
                 const units = [['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1]];
-                for (const element of document.querySelectorAll('time[datetime]')) {
+                for (const element of document.querySelectorAll('time.exact[datetime]')) {
+                  element.textContent = new Date(element.dateTime).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+                }
+                for (const element of document.querySelectorAll('time[datetime]:not(.exact)')) {
                   const moment = new Date(element.dateTime);
                   const seconds = Math.round((moment.getTime() - Date.now()) / 1000);
                   const [unit, size] = units.find(([, length]) => Math.abs(seconds) >= length) ?? units[units.length - 1];
