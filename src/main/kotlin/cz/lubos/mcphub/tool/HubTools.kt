@@ -2,6 +2,7 @@ package cz.lubos.mcphub.tool
 
 import cz.lubos.mcphub.database.DatabaseEnvironment
 import cz.lubos.mcphub.database.EnvironmentRegistry
+import cz.lubos.mcphub.query.QueryLimits
 import cz.lubos.mcphub.query.QueryResult
 import cz.lubos.mcphub.query.QueryRunner
 import cz.lubos.mcphub.status.EnvironmentStatusReporter
@@ -65,7 +66,13 @@ class HubTools(
             "afterwards, on every environment, so anything that writes is refused by the database " +
             "itself; execute_write_statement is the tool for changing data. " +
             "Results are capped by row count, by overall size and by the length of a single text " +
-            "value, and the notes in the answer say whenever a cap cut something off.",
+            "value, and the notes in the answer say whenever a cap cut something off. A shortened value " +
+            "ends with …(+N), N being the characters left out. rows and textValueCharacters raise or " +
+            "lower the caps up to the environment's ceilings; prefer LIMIT and a narrower select over " +
+            "large values, since every row and character costs context. format toon returns the same " +
+            "answer as compact text: the column names once, then one comma-separated line per row, with " +
+            "values that contain a delimiter, are empty or read as null, true or false written as JSON " +
+            "strings.",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
             destructiveHint = false,
@@ -82,21 +89,44 @@ class HubTools(
                 "database. Oracle refuses a trailing semicolon, so leave it out.",
         )
         sql: String,
-    ): QueryResponse {
+        @McpToolParam(
+            required = false,
+            description = "Largest number of rows to return. The environment's default when left out, " +
+                "500 unless configured otherwise; a value above its ceiling is lowered to the ceiling.",
+        )
+        rows: Int?,
+        @McpToolParam(
+            required = false,
+            description = "Length a text value is shortened to. The environment's default when left out, " +
+                "200 unless configured otherwise; 0 asks for the longest the environment allows.",
+        )
+        textValueCharacters: Int?,
+        @McpToolParam(required = false, description = "json, the default, or toon for a more compact answer.")
+        format: String?,
+    ): Any {
         val databaseEnvironment = environmentRegistry.requireEnvironment(environment)
+        val toon = when (format?.lowercase()) {
+            null, "json" -> false
+            "toon" -> true
+            else -> throw IllegalArgumentException("format must be json or toon, not $format.")
+        }
+        val limits = QueryLimits.requested(databaseEnvironment.settings, rows, textValueCharacters)
 
-        return try {
-            respond(databaseEnvironment, queryRunner.run(databaseEnvironment, sql))
+        val response = try {
+            respond(databaseEnvironment, queryRunner.run(databaseEnvironment, sql, limits), limits)
         } catch (failure: SQLException) {
             throw IllegalStateException(failureMessage(databaseEnvironment, failure), failure)
         }
+        return if (toon) ToonEncoder.encode(response) else response
     }
 
-    private fun respond(environment: DatabaseEnvironment, result: QueryResult): QueryResponse {
+    private fun respond(environment: DatabaseEnvironment, result: QueryResult, limits: QueryLimits): QueryResponse {
         val settings = environment.settings
         val notes = buildList {
+            addAll(limits.cappedRequests)
             if (result.truncatedAtRowLimit) {
-                add("Only the first ${settings.maxRows} rows are shown; more rows match this query.")
+                val raise = if (limits.rows < settings.maxRows) "Raise rows (up to ${settings.maxRows}) or page" else "Page"
+                add("Only the first ${limits.rows} rows are shown; more rows match this query. $raise the query.")
             }
             if (result.truncatedAtResponseSize) {
                 add(
@@ -104,8 +134,12 @@ class HubTools(
                         "characters; more rows match this query.",
                 )
             }
-            if (result.truncatedTextValues) {
-                add("At least one text value was shortened to ${settings.maxTextValueCharacters} characters.")
+            if (result.shortenedColumns.isNotEmpty()) {
+                add(
+                    "Values in ${result.shortenedColumns.joinToString()} were shortened to " +
+                        "${limits.textValueCharacters} characters, marked …(+N); raise textValueCharacters " +
+                        "(up to ${settings.maxTextValueCharacters}; 0 asks for that ceiling).",
+                )
             }
         }
         return QueryResponse(

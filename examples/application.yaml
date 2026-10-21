@@ -4,7 +4,8 @@
 mcp-hub:
   # Optional. These are the built-in defaults; override only what you need.
   defaults:
-    max-rows: 500
+    default-rows: 500
+    max-rows: 5000
     query-timeout-seconds: 60
 
   environments:
@@ -18,6 +19,7 @@ mcp-hub:
       password: ${ORACLE_SALES_PASSWORD}
       schema: SALES
       read-only: true
+      default-rows: 100
       max-rows: 200
       pool:
         maximum-size: 3

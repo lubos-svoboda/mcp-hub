@@ -4,6 +4,7 @@ import cz.lubos.mcphub.config.EntraAccountProperties
 import cz.lubos.mcphub.config.HubProperties
 import cz.lubos.mcphub.database.EnvironmentRegistry
 import cz.lubos.mcphub.status.EnvironmentStatusReporter
+import cz.lubos.mcphub.status.ReleaseCheck
 import cz.lubos.mcphub.status.StatusController
 import cz.lubos.mcphub.support.FakeEntraTokenClient
 import cz.lubos.mcphub.support.FakeEntraTokenClient.Companion.TENANT_ID
@@ -37,7 +38,7 @@ class EntraSignInControllerTest {
             connectionProbe,
             PgpassExport(hubProperties, accounts),
         ),
-        StatusController(EnvironmentStatusReporter(listOf(environmentRegistry), connectionProbe, accounts, PgpassExport(hubProperties, accounts)), connectionProbe),
+        StatusController(EnvironmentStatusReporter(listOf(environmentRegistry), connectionProbe, accounts, PgpassExport(hubProperties, accounts)), connectionProbe, ReleaseCheck(currentVersion = null, builtAt = null, enabled = false)),
     ).build()
 
     @AfterEach

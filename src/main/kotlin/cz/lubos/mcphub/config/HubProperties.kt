@@ -12,27 +12,38 @@ data class HubProperties(
     val statusPageUrl: String = "http://localhost:8282/status",
     /** Host names the server answers to besides localhost, 127.0.0.1 and ::1, which it always answers to. */
     val additionalAllowedHosts: List<String> = emptyList(),
+    /** Asks GitHub every few hours for the latest release, so the status page can point to a newer one. */
+    val updateCheck: Boolean = true,
 ) {
     fun resolveSettings(): Map<String, EnvironmentSettings> =
         environments.mapValues { (name, environment) -> resolveEnvironment(name, environment) }
 
-    private fun resolveEnvironment(name: String, environment: EnvironmentProperties) =
-        EnvironmentSettings(
+    private fun resolveEnvironment(name: String, environment: EnvironmentProperties): EnvironmentSettings {
+        val maxRows = environment.maxRows ?: defaults.maxRows
+        val maxTextValueCharacters = environment.maxTextValueCharacters ?: defaults.maxTextValueCharacters
+        return EnvironmentSettings(
             name = name,
             description = environment.description,
             type = environment.type,
             schema = environment.schema,
             readOnly = environment.readOnly,
-            maxRows = environment.maxRows ?: defaults.maxRows,
+            // A default above the ceiling would never apply, so a configuration that only lowers max-rows keeps working.
+            defaultRows = minOf(environment.defaultRows ?: defaults.defaultRows, maxRows),
+            maxRows = maxRows,
             queryTimeoutSeconds = environment.queryTimeoutSeconds ?: defaults.queryTimeoutSeconds,
             maxResponseCharacters = environment.maxResponseCharacters ?: defaults.maxResponseCharacters,
-            maxTextValueCharacters = environment.maxTextValueCharacters ?: defaults.maxTextValueCharacters,
+            defaultTextValueCharacters = minOf(
+                environment.defaultTextValueCharacters ?: defaults.defaultTextValueCharacters,
+                maxTextValueCharacters,
+            ),
+            maxTextValueCharacters = maxTextValueCharacters,
             maxSourceLines = environment.maxSourceLines ?: defaults.maxSourceLines,
             connectTimeoutSeconds = environment.connectTimeoutSeconds ?: defaults.connectTimeoutSeconds,
             socketReadTimeoutSeconds = environment.socketReadTimeoutSeconds ?: defaults.socketReadTimeoutSeconds,
             pool = resolvePool(environment.pool),
             entraAccount = environment.entraAccount,
         )
+    }
 
     private fun resolvePool(pool: PoolProperties) =
         PoolSettings(
@@ -48,9 +59,13 @@ data class ProbeProperties(
 )
 
 data class EnvironmentDefaults(
-    val maxRows: Int = 500,
+    /** Rows a query returns unless the call asks for another number, up to [maxRows]. */
+    val defaultRows: Int = 500,
+    val maxRows: Int = 5_000,
     val queryTimeoutSeconds: Int = 60,
     val maxResponseCharacters: Int = 100_000,
+    /** Length a text value is shortened to unless the call asks for another, up to [maxTextValueCharacters]. */
+    val defaultTextValueCharacters: Int = 200,
     val maxTextValueCharacters: Int = 4_000,
     /** Source is paged by line, the unit ALL_SOURCE itself is stored in. */
     val maxSourceLines: Int = 1_000,
@@ -130,9 +145,11 @@ data class EnvironmentProperties(
     /** The Harbor project the tools work in and the probe checks the token against; required for HARBOR only. */
     val project: String? = null,
     val readOnly: Boolean = true,
+    val defaultRows: Int? = null,
     val maxRows: Int? = null,
     val queryTimeoutSeconds: Int? = null,
     val maxResponseCharacters: Int? = null,
+    val defaultTextValueCharacters: Int? = null,
     val maxTextValueCharacters: Int? = null,
     val maxSourceLines: Int? = null,
     val connectTimeoutSeconds: Int? = null,
@@ -179,9 +196,11 @@ data class EnvironmentSettings(
     val type: EnvironmentType,
     val schema: String?,
     val readOnly: Boolean,
+    val defaultRows: Int,
     val maxRows: Int,
     val queryTimeoutSeconds: Int,
     val maxResponseCharacters: Int,
+    val defaultTextValueCharacters: Int,
     val maxTextValueCharacters: Int,
     val maxSourceLines: Int,
     val connectTimeoutSeconds: Int,

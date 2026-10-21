@@ -361,20 +361,23 @@ Every value below has a built-in default. Override it for all environments under
 ```yaml
 mcp-hub:
   defaults:
-    max-rows: 200
+    default-rows: 200
   environments:
     ORACLE_SALES_DB:
-      max-rows: 50
+      default-rows: 50
+      max-rows: 500
       pool:
         maximum-size: 2
 ```
 
 | Setting | Default | Purpose |
 |---|---|---|
-| `max-rows` | 500 | Largest number of rows a query returns. |
+| `default-rows` | 500 | Rows a query returns unless the call asks for another number with `rows`. |
+| `max-rows` | 5000 | Ceiling for `rows`; a larger request is lowered to it. |
 | `query-timeout-seconds` | 60 | Cancels a statement that runs too long. |
 | `max-response-characters` | 100000 | Stops building an answer once it grows past this. Applies to Grafana answers too. |
-| `max-text-value-characters` | 4000 | Longest single text value; longer ones are cut. |
+| `default-text-value-characters` | 200 | Length a text value is shortened to unless the call asks for another with `textValueCharacters`. |
+| `max-text-value-characters` | 4000 | Ceiling for `textValueCharacters`. |
 | `max-source-lines` | 1000 | Lines of stored program source per call. |
 | `connect-timeout-seconds` | 10 | Gives up on an unreachable host instead of waiting for the operating system. |
 | `socket-read-timeout-seconds` | 120 | Gives up when a connected server stops answering. For Grafana, the request timeout. |
@@ -383,12 +386,16 @@ mcp-hub:
 | `pool.keepalive-seconds` | 120 | How often an idle connection is exercised. |
 | `pool.validation-timeout-seconds` | 5 | How long a liveness check may take. |
 
+A default above its ceiling is lowered to the ceiling, so a configuration written before
+`default-rows` existed, where `max-rows: 50` meant 50 rows for every query, still means that.
+
 A few settings apply to the whole server and sit directly under `mcp-hub`:
 
 | Setting | Default | Purpose |
 |---|---|---|
 | `probe.interval-seconds` | 15 | How often every environment is checked. |
 | `status-page-url` | `http://localhost:8282/status` | Where a browser reaches the status page. Messages asking for an Entra sign-in name it, so set it when the port is published under another number. |
+| `update-check` | `true` | Asks GitHub every 6 hours for the latest release, so the status page can announce a newer one. `false` keeps the server from contacting GitHub. |
 | `additional-allowed-hosts` | none | Host names the server answers to besides `localhost`, `127.0.0.1` and `::1`, which it always answers to. Add one, for example `host.docker.internal`, only when a client reaches the server under that name. |
 
 ## Tools
@@ -427,9 +434,28 @@ fewer tokens than repeating the names on every row:
 ```
 
 Every value is text, so a number keeps precision a double would lose. Dates and timestamps are
-ISO-8601 exactly as stored, never shifted into the server's time zone. `CLOB` and long text are
-cut at `max-text-value-characters`, binary values are reported by their size only, and `null`
-stays `null`. `notes` says whenever a limit cut the answer short.
+ISO-8601 exactly as stored, never shifted into the server's time zone. Binary values are reported
+by their size only, and `null` stays `null`. `notes` says whenever a limit cut the answer short.
+
+`run_sql_query` takes three optional parameters that keep answers small:
+
+- `rows` sets how many rows come back, up to `max-rows`.
+- `textValueCharacters` sets the length a text value, `CLOB` included, is shortened to, up to
+  `max-text-value-characters`; `0` asks for that ceiling. A shortened value ends with `…(+N)`, N
+  being the characters left out, and `notes` names the columns that were shortened.
+- `format: toon` returns the answer in [TOON](https://github.com/toon-format/toon), which writes
+  the column names once and every row as one comma-separated line. A value that contains a
+  delimiter, is empty or reads as `null`, `true` or `false` is written as a JSON string:
+
+```
+environment: ORACLE_SALES_DB
+readOnly: true
+rowCount: 2
+notes[0]:
+rows[2]{ID,AMOUNT,NOTE}:
+  1,12345678901234567890.123,"Paid, late"
+  2,99.5,null
+```
 
 A failed call comes back as a tool error carrying the database's or Grafana's own message,
 unchanged. When the environment was already known to be down, the error adds since when and
@@ -441,7 +467,7 @@ why.
 
 | Address | Content |
 |---|---|
-| <http://127.0.0.1:8282/status> | Every environment with its state, since when it holds, access mode, pool usage and last error, and every Entra account with its state, user, token expiry, last refresh, last error and password file, with a button to sign in or out. *Check now* checks every environment at once and *Check* one of them; while a check runs the page reloads every 2 seconds, otherwise every 10, and times read as how long ago or how soon they are, in your browser's language. `/` redirects here. |
+| <http://127.0.0.1:8282/status> | The running version, linked to its release, and when it was built, with a banner when GitHub has a newer release. Every environment with its state, since when it holds, access mode, pool usage and last error, and every Entra account with its state, user, token expiry, last refresh, last error and password file, with a button to sign in or out. *Check now* checks every environment at once and *Check* one of them; while a check runs the page reloads every 2 seconds, otherwise every 10, and times read as how long ago or how soon they are, in your browser's language. `/` redirects here. |
 | <http://127.0.0.1:8282/status.json> | The same as JSON, for scripts and monitoring. |
 
 ### Refused credentials

@@ -1,6 +1,5 @@
 package cz.lubos.mcphub.query
 
-import cz.lubos.mcphub.config.EnvironmentSettings
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.sql.ResultSet
@@ -24,35 +23,37 @@ data class QueryResult(
     val rows: List<List<String?>>,
     val truncatedAtRowLimit: Boolean,
     val truncatedAtResponseSize: Boolean,
-    val truncatedTextValues: Boolean,
+    /** Columns in which at least one text value was shortened, in column order. */
+    val shortenedColumns: List<String>,
 )
 
 @Component
 class ResultMapper {
 
-    fun map(resultSet: ResultSet, settings: EnvironmentSettings): QueryResult {
+    fun map(resultSet: ResultSet, limits: QueryLimits, maxResponseCharacters: Int): QueryResult {
         val metaData = resultSet.metaData
         val columnIndexes = 1..metaData.columnCount
         val columns = columnIndexes.map(metaData::getColumnLabel)
 
         val rows = mutableListOf<List<String?>>()
         var renderedCharacters = 0
-        var truncatedTextValues = false
+        val shortenedColumns = linkedSetOf<String>()
         var truncatedAtResponseSize = false
 
-        while (rows.size < settings.maxRows && resultSet.next()) {
+        val textValueCharacters = limits.textValueCharacters
+        while (rows.size < limits.rows && resultSet.next()) {
             val row = columnIndexes.map { columnIndex ->
-                val value = readValue(resultSet, metaData, columnIndex, settings.maxTextValueCharacters)
-                if (value != null && value.length > settings.maxTextValueCharacters) {
-                    truncatedTextValues = true
-                    value.take(settings.maxTextValueCharacters)
+                val (value, length) = readValueWithLength(resultSet, metaData, columnIndex, textValueCharacters)
+                if (value != null && length > textValueCharacters) {
+                    shortenedColumns += columns[columnIndex - 1]
+                    value.take(textValueCharacters) + "…(+${length - textValueCharacters})"
                 } else {
                     value
                 }
             }
             rows += row
             renderedCharacters += row.sumOf { it?.length ?: 0 }
-            if (renderedCharacters >= settings.maxResponseCharacters) {
+            if (renderedCharacters >= maxResponseCharacters) {
                 truncatedAtResponseSize = true
                 break
             }
@@ -61,23 +62,30 @@ class ResultMapper {
         // The statement was allowed one row beyond the limit purely so that one more
         // available row proves the result is incomplete.
         val truncatedAtRowLimit =
-            !truncatedAtResponseSize && rows.size == settings.maxRows && resultSet.next()
+            !truncatedAtResponseSize && rows.size == limits.rows && resultSet.next()
 
         return QueryResult(
             columns = columns,
             rows = rows,
             truncatedAtRowLimit = truncatedAtRowLimit,
             truncatedAtResponseSize = truncatedAtResponseSize,
-            truncatedTextValues = truncatedTextValues,
+            shortenedColumns = shortenedColumns.toList(),
         )
     }
 
-    private fun readValue(
+    /** The value and its full length, which for a CLOB is more than was fetched. */
+    private fun readValueWithLength(
         resultSet: ResultSet,
         metaData: ResultSetMetaData,
         columnIndex: Int,
-        maxTextValueCharacters: Int,
-    ): String? =
+        textValueCharacters: Int,
+    ): Pair<String?, Long> =
+        when (metaData.getColumnType(columnIndex)) {
+            Types.CLOB, Types.NCLOB -> readClob(resultSet, columnIndex, textValueCharacters)
+            else -> readValue(resultSet, metaData, columnIndex).let { value -> value to (value?.length?.toLong() ?: 0L) }
+        }
+
+    private fun readValue(resultSet: ResultSet, metaData: ResultSetMetaData, columnIndex: Int): String? =
         when (metaData.getColumnType(columnIndex)) {
             // Read as a local date-time rather than through java.sql.Timestamp: Oracle DATE and
             // TIMESTAMP hold no zone, and converting via an instant would shift them by whatever
@@ -121,9 +129,6 @@ class ResultMapper {
                 resultSet.getString(columnIndex)
             }
 
-            Types.CLOB, Types.NCLOB ->
-                readClob(resultSet, columnIndex, maxTextValueCharacters)
-
             Types.BLOB ->
                 readBlobDescription(resultSet, columnIndex)
 
@@ -134,11 +139,11 @@ class ResultMapper {
             else -> resultSet.getString(columnIndex)
         }
 
-    /** Only the cap plus one character is fetched, so a huge value never reaches memory. */
-    private fun readClob(resultSet: ResultSet, columnIndex: Int, maxTextValueCharacters: Int): String? {
-        val clob = resultSet.getClob(columnIndex) ?: return null
+    /** Only the limit is fetched, so a huge value never reaches memory; its length says how much was left out. */
+    private fun readClob(resultSet: ResultSet, columnIndex: Int, textValueCharacters: Int): Pair<String?, Long> {
+        val clob = resultSet.getClob(columnIndex) ?: return null to 0L
         try {
-            return clob.getSubString(1, maxTextValueCharacters + 1)
+            return clob.getSubString(1, textValueCharacters) to clob.length()
         } finally {
             clob.free()
         }

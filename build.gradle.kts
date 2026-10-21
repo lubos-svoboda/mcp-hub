@@ -44,6 +44,11 @@ tasks.processResources {
 	}
 }
 
+// The status page shows the version and when it was built; a release image is built from its tag.
+springBoot {
+	buildInfo()
+}
+
 // Without this, build/libs also holds a plain library jar that the Dockerfile's COPY
 // would match alongside the executable one.
 tasks.jar {

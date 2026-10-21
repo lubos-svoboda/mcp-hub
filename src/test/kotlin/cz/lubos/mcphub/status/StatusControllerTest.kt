@@ -23,6 +23,9 @@ import cz.lubos.mcphub.support.awaitIdle
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import com.sun.net.httpserver.HttpServer
+import java.net.InetSocketAddress
+import java.net.URI
 import java.time.Instant
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -48,8 +51,9 @@ class StatusControllerTest {
     private val accounts = EntraAccountRegistry(hubProperties, { tokenClient }, clock)
     private val environmentRegistry = EnvironmentRegistry(hubProperties, accounts)
     private val connectionProbe = ConnectionProbe(listOf(environmentRegistry), hubProperties)
+    private val releaseCheck = ReleaseCheck(currentVersion = "0.5.0", builtAt = Instant.parse("2026-10-21T08:00:00Z"), enabled = false)
     private val reporter = EnvironmentStatusReporter(listOf(environmentRegistry), connectionProbe, accounts, PgpassExport(hubProperties, accounts))
-    private val controller = StatusController(reporter, connectionProbe)
+    private val controller = StatusController(reporter, connectionProbe, releaseCheck)
 
     @AfterEach
     fun close() = environmentRegistry.close()
@@ -96,7 +100,7 @@ class StatusControllerTest {
             PgpassExport(HubProperties(), plainAccounts),
         )
 
-        assertThat(StatusController(plainReporter, plainProbe).statusAsPage()).doesNotContain("Entra accounts")
+        assertThat(StatusController(plainReporter, plainProbe, releaseCheck).statusAsPage()).doesNotContain("Entra accounts")
     }
 
     /** Right after a sign-in or a click on Check now the outcome is seconds away, not a whole reload. */
@@ -117,7 +121,7 @@ class StatusControllerTest {
             override fun targets(): Collection<ProbeTarget> = listOf(slowTarget)
         }
         val probe = ConnectionProbe(listOf(registry), HubProperties())
-        val page = StatusController(EnvironmentStatusReporter(listOf(registry), probe, accounts, PgpassExport(hubProperties, accounts)), probe)
+        val page = StatusController(EnvironmentStatusReporter(listOf(registry), probe, accounts, PgpassExport(hubProperties, accounts)), probe, releaseCheck)
 
         probe.probeAllInBackground()
         val whileChecking = page.statusAsPage()
@@ -146,8 +150,8 @@ class StatusControllerTest {
         val probe = ConnectionProbe(listOf(registry), HubProperties())
         val reporter = EnvironmentStatusReporter(listOf(registry), probe, accounts, PgpassExport(hubProperties, accounts))
 
-        val page = StatusController(reporter, probe).statusAsPage()
-        val environment = StatusController(reporter, probe).statusAsJson().single()
+        val page = StatusController(reporter, probe, releaseCheck).statusAsPage()
+        val environment = StatusController(reporter, probe, releaseCheck).statusAsJson().single()
 
         assertThat(page).contains("""<div class="banner refused">""")
             .contains("<strong>ORACLE_SHARED_DB</strong> refused its credentials")
@@ -159,6 +163,40 @@ class StatusControllerTest {
     @Test
     fun `a page without refused credentials has no refusal banner`() {
         assertThat(controller.statusAsPage()).doesNotContain("banner refused")
+    }
+
+    @Test
+    fun `the header shows the running version, linked to its release, and when it was built`() {
+        val page = controller.statusAsPage()
+
+        assertThat(page)
+            .contains("""<a href="https://github.com/lubos-svoboda/mcp-hub/releases/tag/v0.5.0">v0.5.0</a>""")
+            .contains("""built <time datetime="2026-10-21T08:00:00Z">""")
+            .doesNotContain("is available")
+    }
+
+    @Test
+    fun `a newer release on GitHub is announced with a link to its notes`() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/") { exchange ->
+            val bytes = """{"tag_name":"v0.5.1","html_url":"https://github.com/lubos-svoboda/mcp-hub/releases/tag/v0.5.1"}"""
+                .toByteArray()
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+        }
+        server.start()
+        val outdated = try {
+            ReleaseCheck("0.5.0", null, enabled = true, latestReleaseUri = URI.create("http://127.0.0.1:${server.address.port}/"))
+                .also(ReleaseCheck::refresh)
+        } finally {
+            server.stop(0)
+        }
+
+        val page = StatusController(reporter, connectionProbe, outdated).statusAsPage()
+
+        assertThat(page)
+            .contains("MCP Hub <strong>0.5.1</strong> is available")
+            .contains("""<a class="button" href="https://github.com/lubos-svoboda/mcp-hub/releases/tag/v0.5.1">Release notes</a>""")
     }
 
     private companion object {

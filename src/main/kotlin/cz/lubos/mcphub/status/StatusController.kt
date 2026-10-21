@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets
 class StatusController(
     private val environmentStatusReporter: EnvironmentStatusReporter,
     private val connectionProbe: ConnectionProbe,
+    private val releaseCheck: ReleaseCheck,
 ) {
 
     /** Nothing else is served from the root, so opening the host lands on the status page. */
@@ -120,6 +121,19 @@ class StatusController(
             """.trimIndent()
         }
 
+        val version = releaseCheck.currentVersion?.let { currentVersion ->
+            val built = releaseCheck.builtAt?.let { " · built ${time(it.toString())}" } ?: ""
+            """<span class="version"><a href="${escape(releaseCheck.currentVersionUrl)}">v${escape(currentVersion)}</a>$built</span>"""
+        } ?: """<span class="version"><a href="${ReleaseCheck.REPOSITORY_URL}">GitHub</a></span>"""
+        val newerReleaseBanner = releaseCheck.newerRelease()?.let { release ->
+            val published = release.publishedAt?.let { " published ${time(it.toString())}" } ?: ""
+            """
+            <div class="banner">MCP Hub <strong>${escape(release.version)}</strong> is available$published;
+              this is ${escape(releaseCheck.currentVersion ?: "")}.
+              <a class="button" href="${escape(release.url)}">Release notes</a></div>
+            """.trimIndent()
+        } ?: ""
+
         // While a round runs the page reloads quickly, so the outcome shows as soon as it is known.
         val probing = connectionProbe.isProbing
         val reloadSeconds = if (probing) 2 else 10
@@ -153,6 +167,8 @@ class StatusController(
                 header { display: flex; align-items: center; gap: 1rem; margin: 0 0 1rem; }
                 header h1 { margin: 0; }
                 .probe { color: #6b6b6b; display: flex; align-items: center; gap: .4rem; }
+                .version { color: #6b6b6b; font-size: .9em; }
+                .version a { color: inherit; }
                 .spinner { width: .9em; height: .9em; border: 2px solid #c9c9c9; border-top-color: #555;
                   border-radius: 50%; animation: spin .8s linear infinite; }
                 @keyframes spin { to { transform: rotate(360deg); } }
@@ -196,11 +212,13 @@ class StatusController(
             <body>
               <header>
                 <h1>MCP Hub</h1>
+                $version
                 <span class="probe">$probeState</span>
                 <form method="post" action="/status/check"><button type="submit">Check now</button></form>
               </header>
               $refusalBanners
               $banners
+              $newerReleaseBanner
               <table>
                 <tr><th>Environment</th><th>Type</th><th>State</th><th>Since</th><th>Access</th><th>Pool</th><th>Last error</th></tr>
                 $rows

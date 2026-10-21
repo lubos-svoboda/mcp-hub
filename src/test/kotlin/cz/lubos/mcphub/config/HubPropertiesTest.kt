@@ -26,7 +26,10 @@ class HubPropertiesTest {
             assertThat(settings.name).isEqualTo("ORACLE_TEST_DB")
             assertThat(settings.description).isEqualTo("Test environment")
             assertThat(settings.readOnly).isTrue()
-            assertThat(settings.maxRows).isEqualTo(500)
+            assertThat(settings.defaultRows).isEqualTo(500)
+            assertThat(settings.maxRows).isEqualTo(5_000)
+            assertThat(settings.defaultTextValueCharacters).isEqualTo(200)
+            assertThat(settings.maxTextValueCharacters).isEqualTo(4_000)
             assertThat(settings.queryTimeoutSeconds).isEqualTo(60)
             assertThat(settings.connectTimeoutSeconds).isEqualTo(10)
             assertThat(settings.socketReadTimeoutSeconds).isEqualTo(120)
@@ -45,10 +48,43 @@ class HubPropertiesTest {
             .run { context ->
                 val settings = context.resolvedSettings().getValue("ORACLE_TEST_DB")
 
+                assertThat(settings.defaultRows).isEqualTo(25)
                 assertThat(settings.maxRows).isEqualTo(25)
                 assertThat(settings.pool.maximumSize).isEqualTo(2)
                 assertThat(settings.queryTimeoutSeconds).isEqualTo(60)
                 assertThat(settings.pool.minimumIdle).isEqualTo(1)
+            }
+    }
+
+    /** Before default-rows existed, max-rows was the default; such a configuration keeps its meaning. */
+    @Test
+    fun `a default above the ceiling is lowered to it`() {
+        contextRunner
+            .withPropertyValues(
+                "mcp-hub.defaults.default-rows=500",
+                "mcp-hub.environments.ORACLE_TEST_DB.max-rows=100",
+                "mcp-hub.environments.ORACLE_TEST_DB.max-text-value-characters=50",
+            )
+            .run { context ->
+                val settings = context.resolvedSettings().getValue("ORACLE_TEST_DB")
+
+                assertThat(settings.defaultRows).isEqualTo(100)
+                assertThat(settings.defaultTextValueCharacters).isEqualTo(50)
+            }
+    }
+
+    @Test
+    fun `a default and a ceiling are set on their own`() {
+        contextRunner
+            .withPropertyValues(
+                "mcp-hub.environments.ORACLE_TEST_DB.default-rows=100",
+                "mcp-hub.environments.ORACLE_TEST_DB.max-rows=500",
+            )
+            .run { context ->
+                val settings = context.resolvedSettings().getValue("ORACLE_TEST_DB")
+
+                assertThat(settings.defaultRows).isEqualTo(100)
+                assertThat(settings.maxRows).isEqualTo(500)
             }
     }
 

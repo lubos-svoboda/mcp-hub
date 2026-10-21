@@ -45,12 +45,37 @@ class QueryRunnerIT {
         assertThat(result.rows.single()).containsExactly(null, null, null, null)
     }
 
+    /** The marker counts what was left out of the CLOB, which is more than the driver was asked for. */
     @Test
-    fun `a text value longer than the limit is shortened and the result says so`() {
-        val result = runQuery("select note from $SAMPLE_TABLE where id = 1", maxTextValueCharacters = 50)
+    fun `a long CLOB is shortened to the default and says how much was left out`() {
+        val result = runQuery("select note, dbms_lob.getlength(note) as note_length from $SAMPLE_TABLE where id = 1")
 
-        assertThat(result.rows.single().single()).hasSize(50)
-        assertThat(result.truncatedTextValues).isTrue()
+        val (note, noteLength) = result.rows.single()
+        assertThat(note).isEqualTo(requireNotNull(noteStart()).take(200) + "…(+${noteLength!!.toInt() - 200})")
+        assertThat(result.shortenedColumns).containsExactly("NOTE")
+    }
+
+    @Test
+    fun `a text value is shortened to the length the call asks for`() {
+        val result = runQuery("select label from $SAMPLE_TABLE where id = 1", textValueCharacters = 10)
+
+        assertThat(result.rows.single().single()).isEqualTo(CZECH_LABEL.take(10) + "…(+${CZECH_LABEL.length - 10})")
+        assertThat(result.shortenedColumns).containsExactly("LABEL")
+    }
+
+    @Test
+    fun `text value characters of zero read up to the ceiling`() {
+        val result = runQuery("select note from $SAMPLE_TABLE where id = 1", maxTextValueCharacters = 1_000, textValueCharacters = 0)
+
+        assertThat(result.rows.single().single()).startsWith(requireNotNull(noteStart()).take(1_000) + "…(+")
+    }
+
+    @Test
+    fun `a text value within the limit is left whole`() {
+        val result = runQuery("select label from $SAMPLE_TABLE where id = 1")
+
+        assertThat(result.rows.single().single()).isEqualTo(CZECH_LABEL)
+        assertThat(result.shortenedColumns).isEmpty()
     }
 
     @Test
@@ -58,6 +83,14 @@ class QueryRunnerIT {
         val result = runQuery("select id from $SAMPLE_TABLE order by id", maxRows = 2)
 
         assertThat(result.rows).hasSize(2)
+        assertThat(result.truncatedAtRowLimit).isTrue()
+    }
+
+    @Test
+    fun `the call may ask for fewer rows than the default`() {
+        val result = runQuery("select id from $SAMPLE_TABLE order by id", rows = 1)
+
+        assertThat(result.rows).containsExactly(listOf("1"))
         assertThat(result.truncatedAtRowLimit).isTrue()
     }
 
@@ -88,11 +121,19 @@ class QueryRunnerIT {
         sql: String,
         maxRows: Int = 500,
         maxTextValueCharacters: Int = 4_000,
+        rows: Int? = null,
+        textValueCharacters: Int? = null,
     ): QueryResult {
         val hubProperties = OracleTestDatabase.hubProperties(maxRows, maxTextValueCharacters)
         return EnvironmentRegistry(hubProperties).use { registry ->
+            val environment = requireNotNull(registry.find(ENVIRONMENT_NAME))
             QueryRunner(ReadOnlySession(), ResultMapper())
-                .run(requireNotNull(registry.find(ENVIRONMENT_NAME)), sql)
+                .run(environment, sql, QueryLimits.requested(environment.settings, rows, textValueCharacters))
         }
     }
+
+    /** The first 1000 characters, cut by the database itself, so the expected text does not pass through the code under test. */
+    private fun noteStart(): String? =
+        runQuery("select dbms_lob.substr(note, 1000, 1) as note from $SAMPLE_TABLE where id = 1", textValueCharacters = 0)
+            .rows.single().single()
 }

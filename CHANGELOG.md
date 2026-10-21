@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-21
+
+### Added
+
+- `run_sql_query` takes `rows` and `textValueCharacters`, which raise or lower the row limit and
+  the length text values are shortened to, up to the environment's ceilings.
+- `run_sql_query` with `format: toon` returns the answer in TOON, a more compact text format.
+- The status page shows the running version, linked to its release on GitHub, and when it was
+  built, and announces a newer release with a link to its notes. `update-check: false` turns the
+  check off.
+
+### Changed
+
+- `max-rows` is now the ceiling a call may ask for, 5000 by default; the new `default-rows`, 500 by
+  default, is what a query returns without asking. A default above the ceiling is lowered to it,
+  so an existing `max-rows` keeps limiting every query as before.
+- Text values are shortened to 200 characters by default instead of 4000 (`default-text-value-characters`),
+  end with `…(+N)` giving the characters left out, and `notes` names the columns that were shortened.
+
 ## [0.4.1] - 2026-10-08
 
 ### Changed
@@ -122,7 +141,8 @@ All notable changes to this project are documented here. The format follows
 - Versions come from git tags; images for `linux/amd64` and `linux/arm64` are published to
   `ghcr.io/lubos-svoboda/mcp-hub`.
 
-[Unreleased]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.3.1...v0.3.2
