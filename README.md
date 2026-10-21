@@ -378,6 +378,7 @@ mcp-hub:
 | `max-response-characters` | 100000 | Stops building an answer once it grows past this. Applies to Grafana answers too. |
 | `default-text-value-characters` | 200 | Length a text value is shortened to unless the call asks for another with `textValueCharacters`. |
 | `max-text-value-characters` | 4000 | Ceiling for `textValueCharacters`. |
+| `default-format` | `json` | Format of a query answer unless the call asks for another with `format`; `toon` for the compact one. |
 | `max-source-lines` | 1000 | Lines of stored program source per call. |
 | `connect-timeout-seconds` | 10 | Gives up on an unreachable host instead of waiting for the operating system. |
 | `socket-read-timeout-seconds` | 120 | Gives up when a connected server stops answering. For Grafana, the request timeout. |

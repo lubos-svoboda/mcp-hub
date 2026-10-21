@@ -1,5 +1,6 @@
 package cz.lubos.mcphub.tool
 
+import cz.lubos.mcphub.config.QueryFormat
 import cz.lubos.mcphub.database.DatabaseEnvironment
 import cz.lubos.mcphub.database.EnvironmentRegistry
 import cz.lubos.mcphub.query.QueryLimits
@@ -101,15 +102,15 @@ class HubTools(
                 "200 unless configured otherwise; 0 asks for the longest the environment allows.",
         )
         textValueCharacters: Int?,
-        @McpToolParam(required = false, description = "json, the default, or toon for a more compact answer.")
+        @McpToolParam(
+            required = false,
+            description = "json or toon, the more compact one. The environment's default when left out, json " +
+                "unless configured otherwise.",
+        )
         format: String?,
     ): Any {
         val databaseEnvironment = environmentRegistry.requireEnvironment(environment)
-        val toon = when (format?.lowercase()) {
-            null, "json" -> false
-            "toon" -> true
-            else -> throw IllegalArgumentException("format must be json or toon, not $format.")
-        }
+        val queryFormat = QueryFormat.requested(format, databaseEnvironment.settings.defaultFormat)
         val limits = QueryLimits.requested(databaseEnvironment.settings, rows, textValueCharacters)
 
         val response = try {
@@ -117,7 +118,7 @@ class HubTools(
         } catch (failure: SQLException) {
             throw IllegalStateException(failureMessage(databaseEnvironment, failure), failure)
         }
-        return if (toon) ToonEncoder.encode(response) else response
+        return if (queryFormat == QueryFormat.TOON) ToonEncoder.encode(response) else response
     }
 
     private fun respond(environment: DatabaseEnvironment, result: QueryResult, limits: QueryLimits): QueryResponse {

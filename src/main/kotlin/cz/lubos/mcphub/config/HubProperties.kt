@@ -37,6 +37,7 @@ data class HubProperties(
                 maxTextValueCharacters,
             ),
             maxTextValueCharacters = maxTextValueCharacters,
+            defaultFormat = environment.defaultFormat ?: defaults.defaultFormat,
             maxSourceLines = environment.maxSourceLines ?: defaults.maxSourceLines,
             connectTimeoutSeconds = environment.connectTimeoutSeconds ?: defaults.connectTimeoutSeconds,
             socketReadTimeoutSeconds = environment.socketReadTimeoutSeconds ?: defaults.socketReadTimeoutSeconds,
@@ -67,6 +68,8 @@ data class EnvironmentDefaults(
     /** Length a text value is shortened to unless the call asks for another, up to [maxTextValueCharacters]. */
     val defaultTextValueCharacters: Int = 200,
     val maxTextValueCharacters: Int = 4_000,
+    /** Format of a query answer unless the call asks for another. */
+    val defaultFormat: QueryFormat = QueryFormat.JSON,
     /** Source is paged by line, the unit ALL_SOURCE itself is stored in. */
     val maxSourceLines: Int = 1_000,
     val connectTimeoutSeconds: Int = 10,
@@ -89,6 +92,23 @@ enum class EnvironmentType {
     ;
 
     val isDatabase: Boolean get() = this == ORACLE || this == POSTGRESQL
+}
+
+enum class QueryFormat {
+    JSON,
+
+    /** Token-Oriented Object Notation: the column names once, then one comma-separated line per row. */
+    TOON,
+    ;
+
+    companion object {
+        /** A missing request takes the environment's default. */
+        fun requested(format: String?, default: QueryFormat): QueryFormat =
+            format?.let { requested ->
+                entries.firstOrNull { it.name.equals(requested, ignoreCase = true) }
+                    ?: throw IllegalArgumentException("format must be json or toon, not $requested.")
+            } ?: default
+    }
 }
 
 enum class AuthenticationMethod {
@@ -151,6 +171,7 @@ data class EnvironmentProperties(
     val maxResponseCharacters: Int? = null,
     val defaultTextValueCharacters: Int? = null,
     val maxTextValueCharacters: Int? = null,
+    val defaultFormat: QueryFormat? = null,
     val maxSourceLines: Int? = null,
     val connectTimeoutSeconds: Int? = null,
     val socketReadTimeoutSeconds: Int? = null,
@@ -202,6 +223,7 @@ data class EnvironmentSettings(
     val maxResponseCharacters: Int,
     val defaultTextValueCharacters: Int,
     val maxTextValueCharacters: Int,
+    val defaultFormat: QueryFormat,
     val maxSourceLines: Int,
     val connectTimeoutSeconds: Int,
     val socketReadTimeoutSeconds: Int,

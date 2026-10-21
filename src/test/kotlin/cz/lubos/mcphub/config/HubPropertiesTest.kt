@@ -74,6 +74,35 @@ class HubPropertiesTest {
     }
 
     @Test
+    fun `the default format is json and is set in lower case for all environments or one`() {
+        contextRunner.run { context ->
+            assertThat(context.resolvedSettings().getValue("ORACLE_TEST_DB").defaultFormat).isEqualTo(QueryFormat.JSON)
+        }
+        contextRunner
+            .withPropertyValues("mcp-hub.defaults.default-format=toon")
+            .run { context ->
+                assertThat(context.resolvedSettings().getValue("ORACLE_TEST_DB").defaultFormat).isEqualTo(QueryFormat.TOON)
+            }
+        contextRunner
+            .withPropertyValues(
+                "mcp-hub.defaults.default-format=toon",
+                "mcp-hub.environments.ORACLE_TEST_DB.default-format=json",
+            )
+            .run { context ->
+                assertThat(context.resolvedSettings().getValue("ORACLE_TEST_DB").defaultFormat).isEqualTo(QueryFormat.JSON)
+            }
+    }
+
+    @Test
+    fun `a call's format wins over the default, whatever its case`() {
+        assertThat(QueryFormat.requested(null, QueryFormat.TOON)).isEqualTo(QueryFormat.TOON)
+        assertThat(QueryFormat.requested("JSON", QueryFormat.TOON)).isEqualTo(QueryFormat.JSON)
+        assertThat(QueryFormat.requested("toon", QueryFormat.JSON)).isEqualTo(QueryFormat.TOON)
+        assertThat(runCatching { QueryFormat.requested("csv", QueryFormat.JSON) }.exceptionOrNull())
+            .hasMessage("format must be json or toon, not csv.")
+    }
+
+    @Test
     fun `a default and a ceiling are set on their own`() {
         contextRunner
             .withPropertyValues(
