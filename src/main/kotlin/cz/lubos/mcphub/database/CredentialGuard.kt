@@ -70,7 +70,7 @@ class CredentialGuard(
                 when (type) {
                     EnvironmentType.ORACLE -> exception.errorCode in ORACLE_REFUSALS
                     EnvironmentType.POSTGRESQL -> exception.sqlState in POSTGRES_REFUSALS
-                    EnvironmentType.GRAFANA, EnvironmentType.HARBOR -> false
+                    EnvironmentType.GRAFANA, EnvironmentType.HARBOR, EnvironmentType.ARTIFACTORY -> false
                 }
             }
 

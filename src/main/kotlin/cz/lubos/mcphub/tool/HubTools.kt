@@ -35,7 +35,8 @@ class HubTools(
     @McpTool(
         name = "list_environments",
         description = "Lists every environment this server is connected to: databases (type ORACLE " +
-            "or POSTGRESQL), Grafana instances (type GRAFANA) and Harbor registries (type HARBOR). Each entry carries its name, which " +
+            "or POSTGRESQL), Grafana instances (type GRAFANA), Harbor registries (type HARBOR) and " +
+            "Artifactory instances (type ARTIFACTORY). Each entry carries its name, which " +
             "is the value every other tool expects as environment; a description of what it holds " +
             "and when to use it, which is the best guide to choosing between environments; the state (UP, " +
             "CONNECTING or DOWN) and since when it holds; the last error while DOWN; a note while UP but " +

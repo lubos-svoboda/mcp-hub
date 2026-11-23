@@ -61,7 +61,7 @@ class EnvironmentRegistry(
             .filterValues { properties -> properties.type.isDatabase }
             .mapValues { (environmentName, properties) ->
                 require(properties.caFile == null) {
-                    "Environment $environmentName sets ca-file, which only a Grafana or Harbor instance uses. " +
+                    "Environment $environmentName sets ca-file, which only a Grafana, Harbor or Artifactory instance uses. " +
                         "Configure TLS for a database in its JDBC URL instead."
                 }
                 validateAuthentication(environmentName, properties, hubProperties)
@@ -169,8 +169,8 @@ class EnvironmentRegistry(
                 "socketTimeout" to settings.socketReadTimeoutSeconds.toString(),
             )
 
-            // Unreachable: Grafana and Harbor environments never reach a connection pool.
-            EnvironmentType.GRAFANA, EnvironmentType.HARBOR ->
+            // Unreachable: Grafana, Harbor and Artifactory environments never reach a connection pool.
+            EnvironmentType.GRAFANA, EnvironmentType.HARBOR, EnvironmentType.ARTIFACTORY ->
                 error("${settings.name} is a ${settings.type} instance and has no JDBC connection.")
         }
 

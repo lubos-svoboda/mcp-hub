@@ -14,3 +14,6 @@ internal const val JQ_EXPRESSION =
 
 internal const val HARBOR_ENVIRONMENT =
     "Name of a Harbor registry, exactly as list_environments reports it (type HARBOR)."
+
+internal const val ARTIFACTORY_ENVIRONMENT =
+    "Name of an Artifactory, exactly as list_environments reports it (type ARTIFACTORY)."

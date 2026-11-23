@@ -4,7 +4,8 @@
 [![Version](https://img.shields.io/github/v/tag/lubos-svoboda/mcp-hub?sort=semver&label=version)](https://github.com/lubos-svoboda/mcp-hub/pkgs/container/mcp-hub)
 
 One long-running [MCP](https://modelcontextprotocol.io) server that gives AI assistants access
-to several Oracle and PostgreSQL databases, Grafana instances and Harbor registries through a
+to several Oracle and PostgreSQL databases, Grafana instances, Harbor registries and JFrog
+Artifactory instances through a
 single set of tools,
 shared by every client session on the machine.
 
@@ -15,8 +16,9 @@ shared by every client session on the machine.
   one.
 - **Shared by every session.** The server speaks streamable HTTP, so every editor window and
   every assistant session on the machine uses the same process and the same connections.
-- **Four kinds of environment:** Oracle, PostgreSQL, Grafana (logs from Loki and the Grafana HTTP
-  API) and Harbor (image versions, their tags and scan results), all configured in one list.
+- **Five kinds of environment:** Oracle, PostgreSQL, Grafana (logs from Loki and the Grafana HTTP
+  API), Harbor (image versions, their tags and scan results) and JFrog Artifactory (image tags,
+  Maven versions and AQL searches), all configured in one list.
 - **Microsoft Entra ID sign-in for Azure Database for PostgreSQL.** Sign in once on the status
   page; the server renews the access token on its own, so no connection drops when a token
   expires and nothing needs reconnecting.
@@ -103,9 +105,9 @@ mcp-hub:
 
 | Property | Required | Purpose |
 |---|---|---|
-| `type` | yes | `ORACLE`, `POSTGRESQL`, `GRAFANA` or `HARBOR`. Selects how the environment is reached. |
+| `type` | yes | `ORACLE`, `POSTGRESQL`, `GRAFANA`, `HARBOR` or `ARTIFACTORY`. Selects how the environment is reached. |
 | `description` | yes | Shown to the assistant by `list_environments`. See [writing a description](#writing-a-description). |
-| `url` | yes | JDBC URL of a database, or base address of a Grafana instance or a Harbor registry. |
+| `url` | yes | JDBC URL of a database, or base address of a Grafana instance, a Harbor registry or an Artifactory. |
 | `read-only` | no | `true` by default. Only `false` lets the writing tools change anything. |
 | `authentication` | no | `PASSWORD` by default. `ENTRA` signs a PostgreSQL environment in with Microsoft Entra ID; see [Microsoft Entra ID](#microsoft-entra-id). |
 | `entra-account` | with `ENTRA` | The entry under `mcp-hub.entra-accounts` to sign in with. |
@@ -353,6 +355,36 @@ HARBOR_TEAM:
 - `scan` of a version is `null` when Harbor has not scanned it or when the account may not see the
   result.
 
+### Artifactory
+
+```yaml
+ARTIFACTORY:
+  type: ARTIFACTORY
+  description: Docker images and Maven artifacts. Use it to find which tags an image has.
+  url: https://artifactory.example.internal/
+  token: ${ARTIFACTORY_TOKEN}
+  ca-file: /config/certs/internal-ca.pem
+```
+
+- `token` is a JFrog access token, sent as `Authorization: Bearer`. A personal token from the web
+  login that `jf login` uses reads what you may read; no username is needed.
+- The probe lists the repositories with the token rather than pinging, which Artifactory answers
+  without one. An expired or revoked token therefore shows as down with
+  `Artifactory refused the token (HTTP 401)`, and a token that may read no repository stays up
+  with a note.
+- The tools only read, so an Artifactory environment is always read-only. `ca-file`, redirects and
+  the configured address work as for Grafana.
+- `list_artifactory_docker_tags` finds the tags with AQL, because the registry API lists them
+  without a date. Unless the token belongs to an administrator, Artifactory accepts an AQL items
+  query only when it names `repo`, `path` and `name`; the tool does, and a query given to
+  `artifactory_aql_search` must too.
+- A remote repository holds only what somebody already fetched through Artifactory. AQL searches
+  it as its cache, for example `docker-hub-cache`, and the Maven versions of Maven Central behind
+  a virtual repository are only those downloaded so far. The `created` time of a tag in a cache is
+  its first pull through Artifactory, not its release.
+- `artifactory_api_request` accepts plain-text answers too, because some endpoints, such as
+  `/artifactory/api/search/latestVersion`, give no JSON.
+
 ### Limits and pool sizing
 
 Every value below has a built-in default. Override it for all environments under
@@ -416,6 +448,10 @@ A few settings apply to the whole server and sit directly under `mcp-hub`:
 | `grafana_api_write` | writable Grafana | Changes something through the Grafana API, for example saves a dashboard. |
 | `list_harbor_artifacts` | Harbor | Versions of one image repository, newest first: tags, push and pull time, size and vulnerabilities by severity. |
 | `harbor_api_request` | Harbor | Reads any Harbor API endpoint, narrowed by an optional jq expression. |
+| `list_artifactory_docker_tags` | Artifactory | Tags of one Docker or OCI image, newest first: when Artifactory stored each and its digest. |
+| `list_artifactory_maven_versions` | Artifactory | Versions of one Maven artifact, in all repositories or in one. |
+| `artifactory_aql_search` | Artifactory | Runs an AQL query, narrowed by an optional jq expression. |
+| `artifactory_api_request` | Artifactory | Reads any Artifactory REST API endpoint, narrowed by an optional jq expression. |
 
 Each tool carries the MCP hints `readOnlyHint` and `destructiveHint`, so a client can ask for
 confirmation before the two writing tools run.

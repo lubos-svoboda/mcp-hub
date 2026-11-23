@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-23
+
+### Added
+
+- JFrog Artifactory as a fifth kind of environment, signed in with an access token, with
+  `list_artifactory_docker_tags`, `list_artifactory_maven_versions`, `artifactory_aql_search` and
+  `artifactory_api_request`.
+
 ## [0.6.0] - 2026-10-21
 
 ### Added
@@ -155,7 +163,8 @@ All notable changes to this project are documented here. The format follows
 - Versions come from git tags; images for `linux/amd64` and `linux/arm64` are published to
   `ghcr.io/lubos-svoboda/mcp-hub`.
 
-[Unreleased]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/lubos-svoboda/mcp-hub/compare/v0.4.1...v0.5.0

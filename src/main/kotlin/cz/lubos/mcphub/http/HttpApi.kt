@@ -19,13 +19,18 @@ class HttpApi(
     private val authorization: String,
     private val httpClient: HttpClient,
     private val requestTimeout: Duration,
+    /** The answers the service may give; a service with plain-text endpoints refuses JSON alone with HTTP 406. */
+    private val accept: String = JSON,
 ) {
 
     val baseUri: URI = URI.create(baseUrl.trimEnd('/'))
 
     /** Returns the answer of a successful request and fails with the service's own words otherwise. */
-    fun request(method: String, endpoint: String, body: String?): String {
-        val response = send(method, endpoint, body)
+    fun request(method: String, endpoint: String, body: String?, contentType: String = JSON): String =
+        successBody(send(method, endpoint, body, contentType), method, endpoint)
+
+    /** For a caller that first handles a status of its own, such as a 404 that means "nothing found". */
+    fun successBody(response: HttpResponse<String>, method: String, endpoint: String): String {
         if (response.statusCode() in 300..399) {
             val location = response.headers().firstValue("Location").orElse("an unknown location")
             throw IllegalStateException(
@@ -58,17 +63,17 @@ class HttpApi(
         return uri
     }
 
-    fun send(method: String, endpoint: String, body: String?): HttpResponse<String> {
+    fun send(method: String, endpoint: String, body: String?, contentType: String = JSON): HttpResponse<String> {
         val request = HttpRequest.newBuilder()
             .uri(resolve(endpoint))
             .timeout(requestTimeout)
             .header("Authorization", authorization)
-            .header("Accept", "application/json")
+            .header("Accept", accept)
             .apply {
                 if (body == null) {
                     method(method, HttpRequest.BodyPublishers.noBody())
                 } else {
-                    header("Content-Type", "application/json")
+                    header("Content-Type", contentType)
                     method(method, HttpRequest.BodyPublishers.ofString(body))
                 }
             }
@@ -88,6 +93,8 @@ class HttpApi(
             .joinToString(": ")
 
     companion object {
+        const val JSON = "application/json"
+
         /** One client per instance, because each may trust its own certificate authority. */
         fun createHttpClient(caFile: String?, connectTimeoutSeconds: Int): HttpClient =
             HttpClient.newBuilder()

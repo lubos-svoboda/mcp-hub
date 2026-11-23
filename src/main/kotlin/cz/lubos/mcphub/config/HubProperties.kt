@@ -89,6 +89,7 @@ enum class EnvironmentType {
     POSTGRESQL,
     GRAFANA,
     HARBOR,
+    ARTIFACTORY,
     ;
 
     val isDatabase: Boolean get() = this == ORACLE || this == POSTGRESQL
@@ -156,7 +157,7 @@ data class EnvironmentProperties(
     val password: String? = null,
     val token: String? = null,
     /**
-     * PEM file with the certificates a Grafana or Harbor instance's HTTPS endpoint is trusted by, replacing
+     * PEM file with the certificates a Grafana, Harbor or Artifactory instance's HTTPS endpoint is trusted by, replacing
      * the JVM's default authorities for that instance only. Databases configure TLS in their URL.
      */
     val caFile: String? = null,
